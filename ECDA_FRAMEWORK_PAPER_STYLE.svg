@@ -1,0 +1,236 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1900" height="1080" viewBox="0 0 1900 1080">
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="11" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 12 6 L 0 12 z" fill="#23344d"/>
+    </marker>
+    <marker id="arrow-soft" markerWidth="11" markerHeight="11" refX="10" refY="5.5" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 11 5.5 L 0 11 z" fill="#6c7480"/>
+    </marker>
+    <style>
+      .bg { fill: #ffffff; }
+      .panel { fill: #f8fafc; stroke: #a8adb4; stroke-width: 3; rx: 16; }
+      .subpanel { fill: #ffffff; stroke: #c9ced6; stroke-width: 2; rx: 12; }
+      .bluebox { fill: #eef6ff; stroke: #3c78b5; stroke-width: 2; rx: 12; }
+      .greenbox { fill: #eefbf4; stroke: #29885f; stroke-width: 2; rx: 12; }
+      .orangebox { fill: #fff3e5; stroke: #c26a1d; stroke-width: 2; rx: 12; }
+      .purplebox { fill: #f5f0ff; stroke: #7b61b3; stroke-width: 2; rx: 12; }
+      .redbox { fill: #fff1f1; stroke: #c94f4f; stroke-width: 2; rx: 12; }
+      .graybox { fill: #f2f4f7; stroke: #a8adb4; stroke-width: 2; rx: 12; }
+      .title { font-family: Arial, Helvetica, sans-serif; font-size: 29px; font-weight: 700; fill: #173153; }
+      .heading { font-family: Arial, Helvetica, sans-serif; font-size: 22px; font-weight: 700; fill: #111827; }
+      .small-heading { font-family: Arial, Helvetica, sans-serif; font-size: 17px; font-weight: 700; fill: #111827; }
+      .text { font-family: Arial, Helvetica, sans-serif; font-size: 14px; fill: #263346; }
+      .small { font-family: Arial, Helvetica, sans-serif; font-size: 12.5px; fill: #4b5563; }
+      .tiny { font-family: Arial, Helvetica, sans-serif; font-size: 11.5px; fill: #64748b; }
+      .mono { font-family: "Courier New", monospace; font-size: 13px; fill: #0f172a; }
+      .caption { font-family: "Times New Roman", Times, serif; font-size: 24px; fill: #111111; }
+      .arrow { stroke: #23344d; stroke-width: 4; fill: none; marker-end: url(#arrow); }
+      .arrow-thin { stroke: #23344d; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
+      .soft { stroke: #6c7480; stroke-width: 2; stroke-dasharray: 7 5; fill: none; marker-end: url(#arrow-soft); }
+      .node-file { fill: #75b7e8; stroke: #276b9f; stroke-width: 1.5; }
+      .node-func { fill: #ef8fa0; stroke: #a93c4f; stroke-width: 1.5; }
+      .node-evi { fill: #f7d66b; stroke: #a56b00; stroke-width: 1.5; }
+      .node-concept { fill: #9ee0bc; stroke: #2c7d54; stroke-width: 1.5; }
+      .node-action { fill: #c8b5ff; stroke: #6d55b1; stroke-width: 1.5; }
+      .node-flow { fill: #d9dee8; stroke: #64748b; stroke-width: 1.5; }
+      .legend-text { font-family: Arial, Helvetica, sans-serif; font-size: 12px; fill: #111827; }
+      .tag { fill: #173153; rx: 8; }
+      .tagtext { font-family: Arial, Helvetica, sans-serif; font-size: 12px; font-weight: 700; fill: #ffffff; }
+      .icon-stroke { stroke: #334155; stroke-width: 2; fill: none; }
+      .file-paper { fill: #e9f2ff; stroke: #4b78ad; stroke-width: 1.5; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1900" height="1080"/>
+
+  <!-- Left input panel -->
+  <rect class="panel" x="45" y="70" width="410" height="780"/>
+  <text class="heading" x="250" y="110" text-anchor="middle">Multi-source Issue Context</text>
+
+  <rect class="subpanel" x="75" y="140" width="350" height="285"/>
+  <circle cx="103" cy="168" r="18" fill="#fff2b8" stroke="#9a7a1c" stroke-width="2"/>
+  <text class="heading" x="130" y="176">Issue Description</text>
+  <text class="small" x="95" y="215">Rendering error: rightmost point is clipped</text>
+  <text class="small" x="95" y="238">URL: /jetpack/connect/plans</text>
+  <text class="small" x="95" y="261">Error: Cannot read property 'ID' of null</text>
+  <text class="small" x="95" y="284">Repro: for (await of [1,2,3])</text>
+  <text class="small" x="95" y="320">Images, OCR, URLs, stack traces, config,</text>
+  <text class="small" x="95" y="342">and reproduction code are kept as</text>
+  <text class="small" x="95" y="364">typed evidence with provenance.</text>
+  <rect class="tag" x="95" y="382" width="250" height="25"/>
+  <text class="tagtext" x="220" y="399" text-anchor="middle">not only natural-language prompt text</text>
+
+  <rect class="subpanel" x="75" y="460" width="350" height="335"/>
+  <text class="heading" x="250" y="497" text-anchor="middle">Repository and Local Indexes</text>
+  <g transform="translate(105,520)">
+    <rect x="0" y="0" width="60" height="48" fill="#d9e4f2" stroke="#6b7280" stroke-width="1.5" rx="5"/>
+    <rect x="78" y="0" width="60" height="48" fill="#d9e4f2" stroke="#6b7280" stroke-width="1.5" rx="5"/>
+    <rect x="156" y="0" width="60" height="48" fill="#d9e4f2" stroke="#6b7280" stroke-width="1.5" rx="5"/>
+    <rect x="0" y="68" width="60" height="48" fill="#d9e4f2" stroke="#6b7280" stroke-width="1.5" rx="5"/>
+    <rect x="78" y="68" width="60" height="48" fill="#d9e4f2" stroke="#6b7280" stroke-width="1.5" rx="5"/>
+    <rect x="156" y="68" width="60" height="48" fill="#d9e4f2" stroke="#6b7280" stroke-width="1.5" rx="5"/>
+    <circle class="node-func" cx="18" cy="18" r="11"/><text class="tiny" x="14" y="22">f</text>
+    <circle class="node-file" cx="95" cy="18" r="11"/><text class="tiny" x="91" y="22">F</text>
+    <circle class="node-func" cx="174" cy="18" r="11"/><text class="tiny" x="170" y="22">f</text>
+    <circle class="node-file" cx="18" cy="86" r="11"/><text class="tiny" x="14" y="90">F</text>
+    <circle class="node-func" cx="95" cy="86" r="11"/><text class="tiny" x="91" y="90">f</text>
+    <circle class="node-file" cx="174" cy="86" r="11"/><text class="tiny" x="170" y="90">F</text>
+  </g>
+  <text class="small" x="105" y="675">Offline language adapters build compact indexes:</text>
+  <text class="small" x="105" y="700">path, symbol, string/i18n, route, config,</text>
+  <text class="small" x="105" y="725">dense vector, and local relation cache.</text>
+  <text class="mono" x="105" y="765">No full graph traversal at inference.</text>
+
+  <!-- Middle framework panel -->
+  <rect class="panel" x="535" y="70" width="905" height="780"/>
+  <text class="heading" x="987.5" y="110" text-anchor="middle">ECDA Core: Evidence-Convergent Diagnostic Search</text>
+
+  <!-- Candidate recall -->
+  <rect class="greenbox" x="575" y="145" width="250" height="235"/>
+  <text class="small-heading" x="700" y="178" text-anchor="middle">1 Candidate Recall</text>
+  <text class="small" x="600" y="212">MM-IR retrieves top-K suspects:</text>
+  <text class="small" x="600" y="240">files, modules/classes, functions,</text>
+  <text class="small" x="600" y="268">literal strings, routes, configs.</text>
+  <g transform="translate(604,302)">
+    <rect class="file-paper" x="0" y="0" width="48" height="38" rx="4"/>
+    <rect class="file-paper" x="64" y="0" width="48" height="38" rx="4"/>
+    <rect class="file-paper" x="128" y="0" width="48" height="38" rx="4"/>
+    <rect class="file-paper" x="192" y="0" width="48" height="38" rx="4"/>
+    <text class="tiny" x="6" y="25">file</text>
+    <text class="tiny" x="70" y="25">mod</text>
+    <text class="tiny" x="134" y="25">func</text>
+    <text class="tiny" x="198" y="25">line</text>
+  </g>
+  <text class="tiny" x="600" y="360">IR finds suspects; later stages test mechanisms.</text>
+
+  <!-- Router -->
+  <rect class="purplebox" x="860" y="145" width="265" height="235"/>
+  <text class="small-heading" x="992.5" y="178" text-anchor="middle">2 Evidence Action Router</text>
+  <text class="small" x="884" y="212">LLM selects only useful actions:</text>
+  <rect class="bluebox" x="885" y="235" width="215" height="28"/><text class="tiny" x="900" y="254">Anchor Binding</text>
+  <rect class="greenbox" x="885" y="270" width="215" height="28"/><text class="tiny" x="900" y="289">State / Dataflow Trace</text>
+  <rect class="orangebox" x="885" y="305" width="215" height="28"/><text class="tiny" x="900" y="324">Visual Mechanism Probe</text>
+  <rect class="purplebox" x="885" y="340" width="215" height="28"/><text class="tiny" x="900" y="359">Repro / Config Context</text>
+
+  <!-- Pruning gate -->
+  <rect class="redbox" x="1160" y="145" width="240" height="235"/>
+  <text class="small-heading" x="1280" y="178" text-anchor="middle">3 Budget Pruner</text>
+  <text class="small" x="1184" y="212">Expansion gate:</text>
+  <text class="mono" x="1184" y="242">gain &gt; epsilon</text>
+  <text class="mono" x="1184" y="268">depth &lt;= 2</text>
+  <text class="mono" x="1184" y="294">nodes &lt;= B</text>
+  <text class="mono" x="1184" y="320">neighbors &lt;= top-m</text>
+  <text class="tiny" x="1184" y="354">Stop on low value, hub files,</text>
+  <text class="tiny" x="1184" y="372">surface-only paths, or stale entities.</text>
+
+  <!-- Local graph -->
+  <rect class="subpanel" x="575" y="425" width="825" height="345"/>
+  <text class="small-heading" x="987.5" y="458" text-anchor="middle">4 Local Mechanism Graph: small case-specific evidence network</text>
+
+  <!-- Graph nodes and edges -->
+  <g>
+    <line x1="670" y1="540" x2="790" y2="580" stroke="#3c78b5" stroke-width="2"/>
+    <line x1="670" y1="540" x2="805" y2="650" stroke="#3c78b5" stroke-width="2"/>
+    <line x1="800" y1="580" x2="945" y2="560" stroke="#29885f" stroke-width="2"/>
+    <line x1="805" y1="650" x2="945" y2="645" stroke="#29885f" stroke-width="2"/>
+    <line x1="945" y1="560" x2="1085" y2="600" stroke="#c26a1d" stroke-width="2"/>
+    <line x1="945" y1="645" x2="1085" y2="600" stroke="#c26a1d" stroke-width="2"/>
+    <line x1="1085" y1="600" x2="1235" y2="580" stroke="#7b61b3" stroke-width="2"/>
+    <line x1="1085" y1="600" x2="1235" y2="670" stroke="#7b61b3" stroke-width="2"/>
+
+    <circle class="node-evi" cx="670" cy="540" r="26"/>
+    <text class="tiny" x="670" y="544" text-anchor="middle">OCR</text>
+    <circle class="node-evi" cx="670" cy="640" r="26"/>
+    <text class="tiny" x="670" y="644" text-anchor="middle">URL</text>
+
+    <circle class="node-action" cx="800" cy="580" r="25"/>
+    <text class="tiny" x="800" y="584" text-anchor="middle">route</text>
+    <circle class="node-action" cx="805" cy="650" r="25"/>
+    <text class="tiny" x="805" y="654" text-anchor="middle">string</text>
+
+    <circle class="node-concept" cx="945" cy="560" r="27"/>
+    <text class="tiny" x="945" y="557" text-anchor="middle">AUTH</text>
+    <text class="tiny" x="945" y="572" text-anchor="middle">REDIRECT</text>
+    <circle class="node-flow" cx="945" cy="645" r="27"/>
+    <text class="tiny" x="945" y="642" text-anchor="middle">state</text>
+    <text class="tiny" x="945" y="657" text-anchor="middle">flow</text>
+
+    <circle class="node-file" cx="1085" cy="600" r="31"/>
+    <text class="tiny" x="1085" y="596" text-anchor="middle">Code</text>
+    <text class="tiny" x="1085" y="612" text-anchor="middle">Node</text>
+
+    <circle class="node-func" cx="1235" cy="580" r="29"/>
+    <text class="tiny" x="1235" y="576" text-anchor="middle">func</text>
+    <text class="tiny" x="1235" y="591" text-anchor="middle">line</text>
+    <circle class="node-func" cx="1235" cy="670" r="29"/>
+    <text class="tiny" x="1235" y="666" text-anchor="middle">func</text>
+    <text class="tiny" x="1235" y="681" text-anchor="middle">line</text>
+  </g>
+
+  <rect class="tag" x="616" y="715" width="250" height="26"/>
+  <text class="tagtext" x="741" y="733" text-anchor="middle">multiple clues converge</text>
+  <text class="small" x="900" y="728">A location is promoted when independent evidence paths meet at</text>
+  <text class="small" x="900" y="750">the same code entity or a short mechanism chain.</text>
+
+  <!-- Right runtime panel -->
+  <rect class="panel" x="1515" y="70" width="340" height="780"/>
+  <text class="heading" x="1685" y="110" text-anchor="middle">Agent Runtime</text>
+
+  <rect class="subpanel" x="1545" y="145" width="280" height="145"/>
+  <text class="small-heading" x="1685" y="176" text-anchor="middle">Planner / Critic</text>
+  <text class="small" x="1570" y="212">Plan diagnostic actions, read tool</text>
+  <text class="small" x="1570" y="234">observations, bridge evidence gaps,</text>
+  <text class="small" x="1570" y="256">and reject unsupported guesses.</text>
+
+  <rect class="orangebox" x="1545" y="325" width="280" height="165"/>
+  <text class="small-heading" x="1685" y="358" text-anchor="middle">Tool Calls</text>
+  <rect class="subpanel" x="1575" y="382" width="220" height="30"/>
+  <text class="tiny" x="1685" y="402" text-anchor="middle">SearchAnchor</text>
+  <rect class="subpanel" x="1575" y="420" width="220" height="30"/>
+  <text class="tiny" x="1685" y="440" text-anchor="middle">TraceFlow</text>
+  <rect class="subpanel" x="1575" y="458" width="220" height="30"/>
+  <text class="tiny" x="1685" y="478" text-anchor="middle">ExpandLocalGraph</text>
+
+  <rect class="greenbox" x="1545" y="525" width="280" height="260"/>
+  <text class="small-heading" x="1685" y="558" text-anchor="middle">Localized Code Sections</text>
+  <text class="mono" x="1570" y="598">Result(1)</text>
+  <text class="mono" x="1570" y="624">file: authorize.js</text>
+  <text class="mono" x="1570" y="650">module: JetpackAuthorize</text>
+  <text class="mono" x="1570" y="676">function: redirect</text>
+  <text class="mono" x="1570" y="702">line: 173</text>
+  <text class="small" x="1570" y="742">evidence_chain + confidence</text>
+  <text class="tiny" x="1570" y="768">schema-verified before reporting</text>
+
+  <!-- Arrows -->
+  <path class="arrow" d="M455 460 L535 460"/>
+  <path class="arrow" d="M825 260 L860 260"/>
+  <path class="arrow" d="M1125 260 L1160 260"/>
+  <path class="arrow" d="M1280 380 C1280 410 1240 425 1210 425"/>
+  <path class="arrow" d="M1000 380 C1000 405 985 420 985 425"/>
+  <path class="arrow" d="M1400 600 L1515 600"/>
+  <path class="soft" d="M1515 220 C1450 230 1395 260 1400 425"/>
+  <path class="soft" d="M1535 408 C1470 440 1420 515 1400 560"/>
+
+  <!-- Legend -->
+  <rect class="subpanel" x="575" y="790" width="825" height="42"/>
+  <circle class="node-evi" cx="610" cy="811" r="10"/><text class="legend-text" x="628" y="815">Evidence</text>
+  <circle class="node-action" cx="710" cy="811" r="10"/><text class="legend-text" x="728" y="815">Action</text>
+  <circle class="node-concept" cx="800" cy="811" r="10"/><text class="legend-text" x="818" y="815">Concept</text>
+  <circle class="node-file" cx="902" cy="811" r="10"/><text class="legend-text" x="920" y="815">Code</text>
+  <circle class="node-flow" cx="985" cy="811" r="10"/><text class="legend-text" x="1003" y="815">Flow</text>
+  <line x1="1090" y1="811" x2="1140" y2="811" stroke="#23344d" stroke-width="2"/>
+  <text class="legend-text" x="1150" y="815">mechanism path</text>
+  <line x1="1280" y1="811" x2="1330" y2="811" stroke="#6c7480" stroke-width="2" stroke-dasharray="6 4"/>
+  <text class="legend-text" x="1340" y="815">feedback / pruning</text>
+
+  <!-- Bottom innovation strip -->
+  <rect class="panel" x="45" y="895" width="1810" height="120"/>
+  <text class="title" x="85" y="935">Key Innovations</text>
+  <text class="text" x="85" y="972">1. Convert multimodal clues into executable diagnostic actions.</text>
+  <text class="text" x="600" y="972">2. Use MM-IR to recall suspects before local graph expansion.</text>
+  <text class="text" x="1135" y="972">3. Build a small mechanism graph, not a full repository graph.</text>
+  <text class="text" x="85" y="1000">4. Prune by evidence value, confidence gap, depth, and node budget.</text>
+  <text class="text" x="760" y="1000">5. Output file/module/function/line with verifiable evidence chains.</text>
+
+  <text class="caption" x="950" y="1055" text-anchor="middle">Figure. Overview of ECDA: evidence-convergent diagnostic localization for multi-modal and multi-language repositories.</text>
+</svg>

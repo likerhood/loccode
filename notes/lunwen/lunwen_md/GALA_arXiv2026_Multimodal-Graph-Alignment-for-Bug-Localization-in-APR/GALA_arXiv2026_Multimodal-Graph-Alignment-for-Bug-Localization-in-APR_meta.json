@@ -1,0 +1,1276 @@
+{
+  "table_of_contents": [
+    {
+      "title": "GALA: Multimodal Graph Alignment for Bug Localization in Automated Program Repair",
+      "heading_level": null,
+      "page_id": 0,
+      "polygon": [
+        [
+          68.25,
+          83.25
+        ],
+        [
+          543.0,
+          81.984375
+        ],
+        [
+          543.0,
+          117.5625
+        ],
+        [
+          68.25,
+          119.109375
+        ]
+      ]
+    },
+    {
+      "title": "Abstract",
+      "heading_level": null,
+      "page_id": 0,
+      "polygon": [
+        [
+          50.80078125,
+          247.11328125
+        ],
+        [
+          96.0,
+          247.11328125
+        ],
+        [
+          96.0,
+          256.5
+        ],
+        [
+          50.80078125,
+          256.5
+        ]
+      ]
+    },
+    {
+      "title": "1 Introduction",
+      "heading_level": null,
+      "page_id": 0,
+      "polygon": [
+        [
+          54.087890625,
+          540.6328125
+        ],
+        [
+          134.25,
+          540.6328125
+        ],
+        [
+          134.25,
+          549.9140625
+        ],
+        [
+          54.087890625,
+          549.9140625
+        ]
+      ]
+    },
+    {
+      "title": "2 Related Work",
+      "heading_level": null,
+      "page_id": 1,
+      "polygon": [
+        [
+          52.59375,
+          602.89453125
+        ],
+        [
+          138.3980712890625,
+          602.89453125
+        ],
+        [
+          138.3980712890625,
+          614.8706512451172
+        ],
+        [
+          52.59375,
+          614.8706512451172
+        ]
+      ]
+    },
+    {
+      "title": "2.1 LLM for Code Localization",
+      "heading_level": null,
+      "page_id": 1,
+      "polygon": [
+        [
+          52.892578125,
+          618.75
+        ],
+        [
+          209.88536071777344,
+          618.75
+        ],
+        [
+          209.88536071777344,
+          630.5616607666016
+        ],
+        [
+          52.892578125,
+          630.5616607666016
+        ]
+      ]
+    },
+    {
+      "title": "2.2 LLM/MLLM for APR",
+      "heading_level": null,
+      "page_id": 1,
+      "polygon": [
+        [
+          316.458984375,
+          378.5575866699219
+        ],
+        [
+          443.7696228027344,
+          377.05078125
+        ],
+        [
+          443.7696228027344,
+          389.4666748046875
+        ],
+        [
+          316.458984375,
+          389.4666748046875
+        ]
+      ]
+    },
+    {
+      "title": "3 Method",
+      "heading_level": null,
+      "page_id": 2,
+      "polygon": [
+        [
+          52.5,
+          426.1640625
+        ],
+        [
+          108.75,
+          426.1640625
+        ],
+        [
+          108.75,
+          435.75
+        ],
+        [
+          52.5,
+          435.75
+        ]
+      ]
+    },
+    {
+      "title": "3.1 Overview",
+      "heading_level": null,
+      "page_id": 2,
+      "polygon": [
+        [
+          52.5,
+          442.01953125
+        ],
+        [
+          125.25,
+          442.01953125
+        ],
+        [
+          125.25,
+          451.5
+        ],
+        [
+          52.5,
+          451.5
+        ]
+      ]
+    },
+    {
+      "title": "3.2 Image Graph Construction",
+      "heading_level": null,
+      "page_id": 2,
+      "polygon": [
+        [
+          52.5,
+          663.75
+        ],
+        [
+          211.5,
+          662.8359375
+        ],
+        [
+          211.5,
+          673.5
+        ],
+        [
+          52.5,
+          673.6640625
+        ]
+      ]
+    },
+    {
+      "title": "3.3 File-level Alignment",
+      "heading_level": null,
+      "page_id": 3,
+      "polygon": [
+        [
+          316.7578125,
+          257.25
+        ],
+        [
+          444.75,
+          256.0078125
+        ],
+        [
+          444.75,
+          267.75
+        ],
+        [
+          316.7578125,
+          268.3828125
+        ]
+      ]
+    },
+    {
+      "title": "Image Graph",
+      "heading_level": null,
+      "page_id": 4,
+      "polygon": [
+        [
+          142.5,
+          87.75
+        ],
+        [
+          205.5,
+          86.23828125
+        ],
+        [
+          205.5,
+          96.75
+        ],
+        [
+          141.345703125,
+          97.83984375
+        ]
+      ]
+    },
+    {
+      "title": "Prompt:",
+      "heading_level": null,
+      "page_id": 4,
+      "polygon": [
+        [
+          64.5,
+          102.8671875
+        ],
+        [
+          98.25,
+          102.8671875
+        ],
+        [
+          98.25,
+          111.0
+        ],
+        [
+          64.5,
+          111.0
+        ]
+      ]
+    },
+    {
+      "title": "Output:",
+      "heading_level": null,
+      "page_id": 4,
+      "polygon": [
+        [
+          63.3515625,
+          192.75
+        ],
+        [
+          90.84375,
+          192.19921875
+        ],
+        [
+          90.84375,
+          199.5
+        ],
+        [
+          63.3515625,
+          200.70703125
+        ]
+      ]
+    },
+    {
+      "title": "File Graph Alignment",
+      "heading_level": null,
+      "page_id": 4,
+      "polygon": [
+        [
+          123.75,
+          248.25
+        ],
+        [
+          225.017578125,
+          247.88671875
+        ],
+        [
+          225.017578125,
+          258.0
+        ],
+        [
+          123.75,
+          259.48828125
+        ]
+      ]
+    },
+    {
+      "title": "Prompt:",
+      "heading_level": null,
+      "page_id": 4,
+      "polygon": [
+        [
+          63.94921875,
+          265.5
+        ],
+        [
+          96.75,
+          264.90234375
+        ],
+        [
+          96.75,
+          273.41015625
+        ],
+        [
+          63.94921875,
+          274.95703125
+        ]
+      ]
+    },
+    {
+      "title": "Output:",
+      "heading_level": null,
+      "page_id": 4,
+      "polygon": [
+        [
+          63.94921875,
+          335.25
+        ],
+        [
+          91.5,
+          334.125
+        ],
+        [
+          91.5,
+          342.0
+        ],
+        [
+          62.75390625,
+          343.40625
+        ]
+      ]
+    },
+    {
+      "title": "Function Graph Alignment",
+      "heading_level": null,
+      "page_id": 4,
+      "polygon": [
+        [
+          112.359375,
+          357.328125
+        ],
+        [
+          237.0,
+          357.328125
+        ],
+        [
+          237.0,
+          368.25
+        ],
+        [
+          112.359375,
+          368.25
+        ]
+      ]
+    },
+    {
+      "title": "Prompt:",
+      "heading_level": null,
+      "page_id": 4,
+      "polygon": [
+        [
+          65.25,
+          375.75
+        ],
+        [
+          97.5,
+          374.34375
+        ],
+        [
+          97.5,
+          382.5
+        ],
+        [
+          64.546875,
+          383.625
+        ]
+      ]
+    },
+    {
+      "title": "Output:",
+      "heading_level": null,
+      "page_id": 4,
+      "polygon": [
+        [
+          63.052734375,
+          449.75390625
+        ],
+        [
+          92.25,
+          449.75390625
+        ],
+        [
+          92.25,
+          458.26171875
+        ],
+        [
+          61.857421875,
+          458.26171875
+        ]
+      ]
+    },
+    {
+      "title": "Patch Generation",
+      "heading_level": null,
+      "page_id": 4,
+      "polygon": [
+        [
+          132.0,
+          496.16015625
+        ],
+        [
+          216.75,
+          496.16015625
+        ],
+        [
+          216.75,
+          506.25
+        ],
+        [
+          131.783203125,
+          506.25
+        ]
+      ]
+    },
+    {
+      "title": "Prompt:",
+      "heading_level": null,
+      "page_id": 4,
+      "polygon": [
+        [
+          65.25,
+          511.62890625
+        ],
+        [
+          99.0,
+          511.62890625
+        ],
+        [
+          99.0,
+          520.13671875
+        ],
+        [
+          65.14453125,
+          520.13671875
+        ]
+      ]
+    },
+    {
+      "title": "Output:",
+      "heading_level": null,
+      "page_id": 4,
+      "polygon": [
+        [
+          64.5,
+          615.75
+        ],
+        [
+          92.25,
+          614.49609375
+        ],
+        [
+          92.25,
+          624.0
+        ],
+        [
+          64.5,
+          624.55078125
+        ]
+      ]
+    },
+    {
+      "title": "Structure aware Refinement via File Graph Alignment.",
+      "heading_level": null,
+      "page_id": 4,
+      "polygon": [
+        [
+          322.435546875,
+          85.46484375
+        ],
+        [
+          561.0,
+          85.46484375
+        ],
+        [
+          561.0,
+          97.06640625
+        ],
+        [
+          321.240234375,
+          97.06640625
+        ]
+      ]
+    },
+    {
+      "title": "3.4 Function-level Alignment",
+      "heading_level": null,
+      "page_id": 4,
+      "polygon": [
+        [
+          316.5,
+          312.75
+        ],
+        [
+          471.75,
+          311.6953125
+        ],
+        [
+          471.75,
+          322.5234375
+        ],
+        [
+          316.5,
+          324.0703125
+        ]
+      ]
+    },
+    {
+      "title": "3.5 Graph-guided Patch Generation",
+      "heading_level": null,
+      "page_id": 5,
+      "polygon": [
+        [
+          53.79800033569336,
+          498.48046875
+        ],
+        [
+          236.14358520507812,
+          498.48046875
+        ],
+        [
+          236.14358520507812,
+          510.0136413574219
+        ],
+        [
+          53.19140625,
+          510.0136413574219
+        ]
+      ]
+    },
+    {
+      "title": "4 Experiments",
+      "heading_level": null,
+      "page_id": 5,
+      "polygon": [
+        [
+          316.458984375,
+          416.91357421875
+        ],
+        [
+          397.6568603515625,
+          416.8828125
+        ],
+        [
+          397.6568603515625,
+          427.8226623535156
+        ],
+        [
+          316.458984375,
+          427.8226623535156
+        ]
+      ]
+    },
+    {
+      "title": "4.1 Implementation Details",
+      "heading_level": null,
+      "page_id": 5,
+      "polygon": [
+        [
+          316.7578125,
+          608.6945648193359
+        ],
+        [
+          460.5478210449219,
+          607.921875
+        ],
+        [
+          460.5478210449219,
+          619.6036682128906
+        ],
+        [
+          316.7578125,
+          619.6036682128906
+        ]
+      ]
+    },
+    {
+      "title": "4.2 Experiment Setup",
+      "heading_level": null,
+      "page_id": 6,
+      "polygon": [
+        [
+          53.7890625,
+          400.4745788574219
+        ],
+        [
+          167.43807983398438,
+          400.25390625
+        ],
+        [
+          167.43807983398438,
+          411.3836669921875
+        ],
+        [
+          52.59375,
+          411.3836669921875
+        ]
+      ]
+    },
+    {
+      "title": "Benchmark Selection",
+      "heading_level": null,
+      "page_id": 6,
+      "polygon": [
+        [
+          53.19140625,
+          413.40234375
+        ],
+        [
+          136.67442321777344,
+          413.40234375
+        ],
+        [
+          136.67442321777344,
+          424.631591796875
+        ],
+        [
+          51.99609375,
+          424.631591796875
+        ]
+      ]
+    },
+    {
+      "title": "Baseline Selection",
+      "heading_level": null,
+      "page_id": 6,
+      "polygon": [
+        [
+          53.79800033569336,
+          611.40234375
+        ],
+        [
+          123.83454895019531,
+          611.40234375
+        ],
+        [
+          123.83454895019531,
+          621.8915557861328
+        ],
+        [
+          53.79800033569336,
+          621.8915557861328
+        ]
+      ]
+    },
+    {
+      "title": "4.3 Evaluation Results on SWE-Bench\nMultimodal",
+      "heading_level": null,
+      "page_id": 6,
+      "polygon": [
+        [
+          316.16015625,
+          299.8525695800781
+        ],
+        [
+          511.94061279296875,
+          298.93359375
+        ],
+        [
+          511.94061279296875,
+          323.712646484375
+        ],
+        [
+          314.96484375,
+          323.712646484375
+        ]
+      ]
+    },
+    {
+      "title": "4.4 Ablation Studies",
+      "heading_level": null,
+      "page_id": 7,
+      "polygon": [
+        [
+          52.59375,
+          530.96484375
+        ],
+        [
+          160.06353759765625,
+          530.96484375
+        ],
+        [
+          160.06353759765625,
+          542.8906860351562
+        ],
+        [
+          52.59375,
+          542.8906860351562
+        ]
+      ]
+    },
+    {
+      "title": "5 Conclusion",
+      "heading_level": null,
+      "page_id": 7,
+      "polygon": [
+        [
+          317.056640625,
+          339.5390625
+        ],
+        [
+          390.8495788574219,
+          339.5390625
+        ],
+        [
+          390.8495788574219,
+          351.1096496582031
+        ],
+        [
+          317.056640625,
+          351.1096496582031
+        ]
+      ]
+    },
+    {
+      "title": "6 Limitations",
+      "heading_level": null,
+      "page_id": 7,
+      "polygon": [
+        [
+          316.458984375,
+          541.79296875
+        ],
+        [
+          391.8968505859375,
+          541.79296875
+        ],
+        [
+          391.8968505859375,
+          553.8496704101562
+        ],
+        [
+          316.458984375,
+          553.8496704101562
+        ]
+      ]
+    },
+    {
+      "title": "References",
+      "heading_level": null,
+      "page_id": 8,
+      "polygon": [
+        [
+          53.7890625,
+          85.4066162109375
+        ],
+        [
+          108.14713287353516,
+          84.3046875
+        ],
+        [
+          108.14713287353516,
+          96.31573486328125
+        ],
+        [
+          53.7890625,
+          96.31573486328125
+        ]
+      ]
+    }
+  ],
+  "page_stats": [
+    {
+      "page_id": 0,
+      "text_extraction_method": "surya",
+      "block_counts": [
+        [
+          "Line",
+          136
+        ],
+        [
+          "Span",
+          58
+        ],
+        [
+          "Text",
+          10
+        ],
+        [
+          "SectionHeader",
+          3
+        ],
+        [
+          "Footnote",
+          2
+        ],
+        [
+          "ListItem",
+          2
+        ],
+        [
+          "PageHeader",
+          1
+        ],
+        [
+          "Figure",
+          1
+        ],
+        [
+          "Caption",
+          1
+        ],
+        [
+          "FigureGroup",
+          1
+        ],
+        [
+          "ListGroup",
+          1
+        ],
+        [
+          "Reference",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 1,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          305
+        ],
+        [
+          "Line",
+          110
+        ],
+        [
+          "Text",
+          11
+        ],
+        [
+          "ListItem",
+          4
+        ],
+        [
+          "SectionHeader",
+          3
+        ],
+        [
+          "PageHeader",
+          1
+        ],
+        [
+          "ListGroup",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 2,
+      "text_extraction_method": "surya",
+      "block_counts": [
+        [
+          "Line",
+          109
+        ],
+        [
+          "Span",
+          34
+        ],
+        [
+          "Text",
+          5
+        ],
+        [
+          "SectionHeader",
+          3
+        ],
+        [
+          "Figure",
+          2
+        ],
+        [
+          "Caption",
+          2
+        ],
+        [
+          "FigureGroup",
+          2
+        ],
+        [
+          "Reference",
+          2
+        ],
+        [
+          "PageHeader",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 3,
+      "text_extraction_method": "surya",
+      "block_counts": [
+        [
+          "Line",
+          119
+        ],
+        [
+          "Span",
+          73
+        ],
+        [
+          "Text",
+          8
+        ],
+        [
+          "PageHeader",
+          1
+        ],
+        [
+          "SectionHeader",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 4,
+      "text_extraction_method": "surya",
+      "block_counts": [
+        [
+          "Span",
+          131
+        ],
+        [
+          "Line",
+          119
+        ],
+        [
+          "Text",
+          17
+        ],
+        [
+          "SectionHeader",
+          14
+        ],
+        [
+          "ListItem",
+          10
+        ],
+        [
+          "ListGroup",
+          4
+        ],
+        [
+          "PageHeader",
+          1
+        ],
+        [
+          "Code",
+          1
+        ],
+        [
+          "Caption",
+          1
+        ],
+        [
+          "Reference",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 5,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          225
+        ],
+        [
+          "Line",
+          110
+        ],
+        [
+          "Text",
+          9
+        ],
+        [
+          "SectionHeader",
+          3
+        ],
+        [
+          "PageHeader",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 6,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          182
+        ],
+        [
+          "Line",
+          90
+        ],
+        [
+          "TableCell",
+          44
+        ],
+        [
+          "Text",
+          6
+        ],
+        [
+          "SectionHeader",
+          4
+        ],
+        [
+          "PageHeader",
+          1
+        ],
+        [
+          "Table",
+          1
+        ],
+        [
+          "Caption",
+          1
+        ],
+        [
+          "TableGroup",
+          1
+        ],
+        [
+          "Reference",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 7,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          207
+        ],
+        [
+          "Line",
+          97
+        ],
+        [
+          "TableCell",
+          53
+        ],
+        [
+          "Text",
+          6
+        ],
+        [
+          "Caption",
+          3
+        ],
+        [
+          "Table",
+          3
+        ],
+        [
+          "SectionHeader",
+          3
+        ],
+        [
+          "Reference",
+          3
+        ],
+        [
+          "TableGroup",
+          2
+        ],
+        [
+          "PageHeader",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 8,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          528
+        ],
+        [
+          "Line",
+          155
+        ],
+        [
+          "ListItem",
+          44
+        ],
+        [
+          "Reference",
+          44
+        ],
+        [
+          "ListGroup",
+          2
+        ],
+        [
+          "PageHeader",
+          1
+        ],
+        [
+          "SectionHeader",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 9,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          71
+        ],
+        [
+          "Line",
+          22
+        ],
+        [
+          "ListItem",
+          7
+        ],
+        [
+          "Reference",
+          5
+        ],
+        [
+          "PageHeader",
+          1
+        ],
+        [
+          "ListGroup",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    }
+  ],
+  "debug_data_path": "debug_data\\GALA_arXiv2026_Multimodal-Graph-Alignment-for-Bug-Localization-in-APR"
+}

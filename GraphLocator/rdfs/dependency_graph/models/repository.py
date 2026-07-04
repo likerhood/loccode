@@ -1,0 +1,124 @@
+from functools import cached_property
+from pathlib import Path
+
+try:
+    from git import Repo, InvalidGitRepositoryError, GitCommandError, NoSuchPathError
+except ImportError:
+    Repo = None
+    InvalidGitRepositoryError = Exception
+    GitCommandError = Exception
+    NoSuchPathError = Exception
+
+from rdfs.dependency_graph.language_adapter import (
+    extensions_for_language,
+    is_auto_language,
+    language_from_path,
+    normalize_language,
+)
+from rdfs.dependency_graph.models import PathLike
+from rdfs.dependency_graph.models.file_node import FileNode
+from rdfs.dependency_graph.models.language import Language
+from rdfs.dependency_graph.utils.log import setup_logger
+
+# Initialize logging
+logger = setup_logger()
+
+
+class Repository:
+    _git_repo: Repo = None
+    repo_path: Path = None
+    language: Language
+
+    code_file_extensions: dict[Language, tuple[str]] = {
+        Language.Auto: (),
+        Language.Mixed: (),
+        Language.CSharp: (".cs", ".csx"),
+        Language.Python: (".py", ".pyi"),
+        Language.Java: (".java",),
+        Language.JavaScript: (".js", ".jsx", ".mjs", ".cjs"),
+        Language.TypeScript: (".ts", ".tsx", ".mts", ".cts", ".ets"),
+        Language.ArkTS: (".ets", ),
+        Language.Kotlin: (".kt", ".kts"),
+        Language.PHP: (".php",),
+        Language.Ruby: (".rb",),
+        Language.C: (".c", ".h"),
+        Language.CPP: (".cpp", ".hpp", ".cc", ".hh", ".cxx", ".hxx", ".c", ".h"),
+        Language.Go: (".go", ".mod"),
+        Language.Swift: (".swift",),
+        Language.Rust: (".rs",),
+        Language.Lua: (".lua",),
+        Language.Bash: (".sh", ".bash"),
+        Language.R: (".r", ".R"),
+    }
+
+    def __init__(self, repo_path: PathLike, language: Language) -> None:
+        if isinstance(repo_path, str):
+            self.repo_path = Path(repo_path)#.expanduser().absolute()
+        else:
+            self.repo_path = repo_path.expanduser().absolute()
+        self.language = normalize_language(language)
+
+        if self.repo_path.is_file():
+            raise NotADirectoryError(f"Repo path {self.repo_path} is not a directory")
+
+        if not self.repo_path.exists():
+            raise FileNotFoundError(f"Repo path {self.repo_path} does not exist")
+
+        if self.language not in self.code_file_extensions:
+            raise ValueError(
+                f"Language {self.language} is not supported to get code files"
+            )
+
+        if Repo is not None:
+            try:
+                self._git_repo = Repo(repo_path)
+            except (InvalidGitRepositoryError, NoSuchPathError):
+                # The repo is not a git repo, just ignore
+                pass
+
+    @property
+    def code_file_suffixes(self) -> tuple[str, ...]:
+        if is_auto_language(self.language):
+            return extensions_for_language(self.language)
+        return self.code_file_extensions[self.language]
+
+    @cached_property
+    def files(self) -> set[FileNode]:
+        files: set[FileNode] = set()
+        # Loop through the file extensions
+        for extension in self.code_file_suffixes:
+            # Use rglob() with a pattern to match the file extension
+            rglob_file_list = list(self.repo_path.rglob(f"*{extension}"))
+
+            # Get the git-ignored files
+            ignored_files = []
+
+            if self._git_repo:
+                try:
+                    ignored_files = self._git_repo.ignored(
+                        *list(self.repo_path.rglob(f"*{extension}"))
+                    )
+                except OSError:
+                    # If the git command argument list is too long, it will raise an OSError.
+                    # In this case, we will invoke the API by iterating through the files one by one
+                    logger.warn(
+                        f"git command argument list is too long, invoking the API by iterating through the files one by one"
+                    )
+                    for file in rglob_file_list:
+                        ignored_files.extend(self._git_repo.ignored(file))
+                except GitCommandError:
+                    pass
+
+            # Add the files to the set filtering out git-ignored files
+            files.update(
+                [
+                    FileNode(
+                        file,
+                        language_from_path(file) if is_auto_language(self.language) else self.language,
+                    )
+                    for file in rglob_file_list
+                    if file.is_file()
+                    if str(file) not in ignored_files
+                ]
+            )
+        return files

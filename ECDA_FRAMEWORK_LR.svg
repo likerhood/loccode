@@ -1,0 +1,254 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2200" height="1250" viewBox="0 0 2200 1250">
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="11" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 12 6 L 0 12 z" fill="#1f2f46"/>
+    </marker>
+    <marker id="arrow-muted" markerWidth="12" markerHeight="12" refX="11" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 12 6 L 0 12 z" fill="#6b7280"/>
+    </marker>
+    <style>
+      .bg { fill: #ffffff; }
+      .title { font-family: Arial, Helvetica, sans-serif; font-size: 34px; font-weight: 700; fill: #102033; }
+      .subtitle { font-family: Arial, Helvetica, sans-serif; font-size: 18px; fill: #526173; }
+      .stage { fill: #ffffff; stroke: #1f2f46; stroke-width: 2.4; rx: 14; }
+      .blue { fill: #f4f8ff; stroke: #2b5f9e; }
+      .green { fill: #f2fbf6; stroke: #247450; }
+      .orange { fill: #fff7ed; stroke: #b35f16; }
+      .purple { fill: #f7f4ff; stroke: #6c54a3; }
+      .gray { fill: #f8fafc; stroke: #657386; }
+      .red { fill: #fff5f5; stroke: #b94a48; }
+      .band { fill: #f8fafc; stroke: #334155; stroke-width: 2.2; rx: 14; }
+      .h1 { font-family: Arial, Helvetica, sans-serif; font-size: 20px; font-weight: 700; fill: #102033; }
+      .h2 { font-family: Arial, Helvetica, sans-serif; font-size: 16px; font-weight: 700; fill: #102033; }
+      .txt { font-family: Arial, Helvetica, sans-serif; font-size: 14px; fill: #253246; }
+      .small { font-family: Arial, Helvetica, sans-serif; font-size: 12.5px; fill: #475569; }
+      .tiny { font-family: Arial, Helvetica, sans-serif; font-size: 11.5px; fill: #64748b; }
+      .mono { font-family: "Courier New", monospace; font-size: 13px; fill: #1f2937; }
+      .arrow { stroke: #1f2f46; stroke-width: 2.6; fill: none; marker-end: url(#arrow); }
+      .muted-arrow { stroke: #6b7280; stroke-width: 2; stroke-dasharray: 7 6; fill: none; marker-end: url(#arrow-muted); }
+      .thin { stroke-width: 1.5; }
+      .tag { fill: #1f2f46; rx: 7; }
+      .tag-text { font-family: Arial, Helvetica, sans-serif; font-size: 11px; font-weight: 700; fill: #ffffff; }
+      .dot-blue { fill: #2b5f9e; }
+      .dot-green { fill: #247450; }
+      .dot-orange { fill: #b35f16; }
+      .dot-purple { fill: #6c54a3; }
+      .dot-red { fill: #b94a48; }
+      .dot-gray { fill: #64748b; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="2200" height="1250"/>
+
+  <text class="title" x="1100" y="48" text-anchor="middle">Evidence-Convergent Diagnostic Agent for Multi-modal Issue Localization</text>
+  <text class="subtitle" x="1100" y="78" text-anchor="middle">Left-to-right framework: candidate recall, evidence-routed local graph expansion, budget-aware pruning, and verifiable three-level localization</text>
+
+  <!-- Stage 1: Inputs -->
+  <rect class="stage gray" x="40" y="135" width="250" height="680"/>
+  <text class="h1" x="165" y="170" text-anchor="middle">1. Issue Evidence</text>
+  <text class="small" x="68" y="205">Typed sources with provenance:</text>
+  <circle class="dot-gray" cx="72" cy="238" r="5"/>
+  <text class="txt" x="88" y="243">Issue text</text>
+  <circle class="dot-blue" cx="72" cy="278" r="5"/>
+  <text class="txt" x="88" y="283">Screenshot / OCR</text>
+  <circle class="dot-green" cx="72" cy="318" r="5"/>
+  <text class="txt" x="88" y="323">URL / Web page</text>
+  <circle class="dot-orange" cx="72" cy="358" r="5"/>
+  <text class="txt" x="88" y="363">Reproduction code</text>
+  <circle class="dot-red" cx="72" cy="398" r="5"/>
+  <text class="txt" x="88" y="403">Error / stack trace</text>
+  <circle class="dot-purple" cx="72" cy="438" r="5"/>
+  <text class="txt" x="88" y="443">Config / build text</text>
+
+  <rect class="tag" x="62" y="492" width="205" height="26"/>
+  <text class="tag-text" x="164.5" y="510" text-anchor="middle">not plain prompt stuffing</text>
+  <text class="small" x="66" y="548">Each source becomes an</text>
+  <text class="small" x="66" y="570">EvidenceNode with type,</text>
+  <text class="small" x="66" y="592">confidence, and possible</text>
+  <text class="small" x="66" y="614">diagnostic actions.</text>
+
+  <text class="tiny" x="66" y="700">Examples:</text>
+  <text class="tiny" x="66" y="723">URL_PATH: /jetpack/connect/plans</text>
+  <text class="tiny" x="66" y="745">VISUAL: rightmost point clipped</text>
+  <text class="tiny" x="66" y="767">ERROR: Cannot read property ID</text>
+
+  <!-- Stage 2: Evidence normalization -->
+  <rect class="stage blue" x="340" y="135" width="260" height="680"/>
+  <text class="h1" x="470" y="170" text-anchor="middle">2. Evidence Interpreter</text>
+  <text class="small" x="365" y="205">LLM extracts typed hypotheses,</text>
+  <text class="small" x="365" y="227">but does not decide locations alone.</text>
+
+  <rect class="stage" x="365" y="260" width="210" height="130"/>
+  <text class="h2" x="470" y="288" text-anchor="middle">EvidenceNode</text>
+  <text class="small" x="385" y="320">URL_PATH, OCR_TEXT,</text>
+  <text class="small" x="385" y="342">ERROR_TEXT, REPRO_CODE,</text>
+  <text class="small" x="385" y="364">CONFIG_TEXT, VISUAL_SYMPTOM</text>
+
+  <rect class="stage" x="365" y="425" width="210" height="145"/>
+  <text class="h2" x="470" y="453" text-anchor="middle">ConceptNode</text>
+  <text class="small" x="385" y="485">AUTH_REDIRECT, NULL_STATE,</text>
+  <text class="small" x="385" y="507">LAYOUT_CLIP, ALPHA_BLEND,</text>
+  <text class="small" x="385" y="529">PARSER_CONTEXT,</text>
+  <text class="small" x="385" y="551">CONFIG_RESOLUTION</text>
+
+  <rect class="tag" x="370" y="625" width="200" height="26"/>
+  <text class="tag-text" x="470" y="643" text-anchor="middle">innovation: executable evidence</text>
+  <text class="small" x="365" y="682">Evidence is converted into</text>
+  <text class="small" x="365" y="704">diagnostic intents, not only</text>
+  <text class="small" x="365" y="726">natural-language summaries.</text>
+
+  <!-- Stage 3: MM-IR recall -->
+  <rect class="stage green" x="650" y="135" width="300" height="680"/>
+  <text class="h1" x="800" y="170" text-anchor="middle">3. MM-IR Candidate Recall</text>
+  <text class="small" x="675" y="205">Fast top-K pool before graph expansion.</text>
+  <text class="small" x="675" y="227">Avoids full-repository search.</text>
+
+  <rect class="stage" x="675" y="260" width="250" height="210"/>
+  <text class="h2" x="800" y="288" text-anchor="middle">Searchable Indexes</text>
+  <text class="small" x="695" y="321">BM25 / dense vector index</text>
+  <text class="small" x="695" y="347">file path / symbol index</text>
+  <text class="small" x="695" y="373">string and i18n index</text>
+  <text class="small" x="695" y="399">route and URL index</text>
+  <text class="small" x="695" y="425">config and package index</text>
+  <text class="small" x="695" y="451">local relation cache</text>
+
+  <rect class="stage" x="675" y="505" width="250" height="145"/>
+  <text class="h2" x="800" y="533" text-anchor="middle">Candidate Pool</text>
+  <text class="small" x="695" y="566">Top-K files</text>
+  <text class="small" x="695" y="592">Top-K modules/classes</text>
+  <text class="small" x="695" y="618">Top-K functions/lines</text>
+
+  <text class="mono" x="675" y="708">pool = union(IR, string, symbol, config)</text>
+  <text class="mono" x="675" y="734">expand only pool + local neighbors</text>
+
+  <!-- Stage 4: Router -->
+  <rect class="stage purple" x="1000" y="135" width="330" height="680"/>
+  <text class="h1" x="1165" y="170" text-anchor="middle">4. Diagnostic Action Router</text>
+  <text class="small" x="1025" y="205">LLM plans actions under a fixed budget.</text>
+  <text class="small" x="1025" y="227">Each action must be grounded by evidence.</text>
+
+  <rect class="stage blue" x="1025" y="260" width="280" height="72"/>
+  <text class="h2" x="1165" y="287" text-anchor="middle">Anchor Binding Search</text>
+  <text class="tiny" x="1045" y="314">URL, route, literal, i18n, error string</text>
+
+  <rect class="stage green" x="1025" y="352" width="280" height="72"/>
+  <text class="h2" x="1165" y="379" text-anchor="middle">State / Dataflow Trace</text>
+  <text class="tiny" x="1045" y="406">null state, selector, variable, stack</text>
+
+  <rect class="stage orange" x="1025" y="444" width="280" height="72"/>
+  <text class="h2" x="1165" y="471" text-anchor="middle">Visual Mechanism Probe</text>
+  <text class="tiny" x="1045" y="498">layout, color, canvas, chart, render path</text>
+
+  <rect class="stage purple" x="1025" y="536" width="280" height="72"/>
+  <text class="h2" x="1165" y="563" text-anchor="middle">Repro / Config Context</text>
+  <text class="tiny" x="1045" y="590">parser fixture, build option, package config</text>
+
+  <rect class="tag" x="1035" y="667" width="260" height="26"/>
+  <text class="tag-text" x="1165" y="685" text-anchor="middle">actions are selected, not all triggered</text>
+  <text class="small" x="1025" y="724">Priority = evidence reliability +</text>
+  <text class="small" x="1025" y="746">expected information gain - cost.</text>
+
+  <!-- Stage 5: Local mechanism graph -->
+  <rect class="stage orange" x="1380" y="135" width="360" height="680"/>
+  <text class="h1" x="1560" y="170" text-anchor="middle">5. Local Mechanism Graph</text>
+  <text class="small" x="1405" y="205">A small case-specific graph, not a</text>
+  <text class="small" x="1405" y="227">global repository skeleton.</text>
+
+  <rect class="stage" x="1405" y="260" width="310" height="185"/>
+  <text class="h2" x="1560" y="288" text-anchor="middle">Nodes</text>
+  <text class="small" x="1425" y="321">EvidenceNode: symptom or source</text>
+  <text class="small" x="1425" y="347">ConceptNode: suspected mechanism</text>
+  <text class="small" x="1425" y="373">ActionNode: executed diagnostic tool</text>
+  <text class="small" x="1425" y="399">CodeNode: file / module / function / line</text>
+  <text class="small" x="1425" y="425">FlowNode: state / prop / config / variable</text>
+
+  <rect class="stage" x="1405" y="475" width="310" height="170"/>
+  <text class="h2" x="1560" y="503" text-anchor="middle">Edges</text>
+  <text class="small" x="1425" y="536">triggers_action, retrieves, mentions</text>
+  <text class="small" x="1425" y="562">calls, imports, reads, writes, flows_to</text>
+  <text class="small" x="1425" y="588">renders, configures, explains, rules_out</text>
+  <text class="small" x="1425" y="614">bridge: route-to-component, fixture-to-parser</text>
+
+  <rect class="tag" x="1418" y="690" width="285" height="26"/>
+  <text class="tag-text" x="1560.5" y="708" text-anchor="middle">innovation: evidence convergence</text>
+  <text class="small" x="1405" y="747">A candidate is trusted when multiple</text>
+  <text class="small" x="1405" y="769">independent evidence paths converge.</text>
+
+  <!-- Stage 6: Pruning -->
+  <rect class="stage red" x="1790" y="135" width="360" height="360"/>
+  <text class="h1" x="1970" y="170" text-anchor="middle">6. Budget-aware Pruning</text>
+  <text class="small" x="1815" y="205">Prevents graph explosion and prompt bloat.</text>
+
+  <rect class="stage" x="1815" y="235" width="310" height="130"/>
+  <text class="h2" x="1970" y="263" text-anchor="middle">Expansion Gate</text>
+  <text class="mono" x="1835" y="296">expand if gain &gt; epsilon</text>
+  <text class="mono" x="1835" y="322">depth &lt;= 2, nodes &lt;= B</text>
+  <text class="mono" x="1835" y="348">neighbors &lt;= top-m by edge score</text>
+
+  <rect class="stage" x="1815" y="390" width="310" height="75"/>
+  <text class="h2" x="1970" y="418" text-anchor="middle">Stop Rules</text>
+  <text class="tiny" x="1835" y="445">score gap large, no new evidence, or budget exhausted</text>
+
+  <!-- Stage 7: Localization -->
+  <rect class="stage green" x="1790" y="535" width="360" height="280"/>
+  <text class="h1" x="1970" y="570" text-anchor="middle">7. Verifiable Localization</text>
+  <text class="small" x="1815" y="605">Rank candidates by mechanism support.</text>
+  <text class="mono" x="1815" y="648">score = IR + coverage + agreement</text>
+  <text class="mono" x="1815" y="674">      + path_support + flow_support</text>
+  <text class="mono" x="1815" y="700">      - surface/hub/cost penalties</text>
+  <text class="small" x="1815" y="745">Output schema:</text>
+  <text class="small" x="1815" y="770">file, module/class, function, line,</text>
+  <text class="small" x="1815" y="792">evidence_chain, confidence</text>
+
+  <!-- Bottom innovation strip -->
+  <rect class="band" x="40" y="875" width="2110" height="300"/>
+  <text class="h1" x="1095" y="912" text-anchor="middle">Core Innovation Details</text>
+
+  <rect class="stage blue" x="80" y="950" width="475" height="180"/>
+  <text class="h2" x="317.5" y="980" text-anchor="middle">A. Evidence becomes executable actions</text>
+  <text class="small" x="105" y="1018">Visual, URL, runtime, repro, and config clues are not merely</text>
+  <text class="small" x="105" y="1042">summarized. They trigger typed searches such as route binding,</text>
+  <text class="small" x="105" y="1066">string/i18n matching, shallow dataflow trace, visual render probe,</text>
+  <text class="small" x="105" y="1090">or parser/config context search.</text>
+
+  <rect class="stage orange" x="610" y="950" width="475" height="180"/>
+  <text class="h2" x="847.5" y="980" text-anchor="middle">B. Local graph, not whole-repo graph</text>
+  <text class="small" x="635" y="1018">The graph is materialized around top-K candidates and evidence</text>
+  <text class="small" x="635" y="1042">bridges. It uses language adapters and cached local relations,</text>
+  <text class="small" x="635" y="1066">so mixed JavaScript, TypeScript, Python, and Java repositories</text>
+  <text class="small" x="635" y="1090">do not require one monolithic parser or full graph traversal.</text>
+
+  <rect class="stage red" x="1140" y="950" width="475" height="180"/>
+  <text class="h2" x="1377.5" y="980" text-anchor="middle">C. Pruning is evidence-value driven</text>
+  <text class="small" x="1165" y="1018">Expansion is allowed only when it adds new evidence coverage,</text>
+  <text class="small" x="1165" y="1042">connects two previously independent clues, or discriminates</text>
+  <text class="small" x="1165" y="1066">between competing candidates. Low-value, hub-like, and</text>
+  <text class="small" x="1165" y="1090">surface-only paths are penalized or stopped.</text>
+
+  <rect class="stage green" x="1670" y="950" width="435" height="180"/>
+  <text class="h2" x="1887.5" y="980" text-anchor="middle">D. Localization is schema-verified</text>
+  <text class="small" x="1695" y="1018">Final predictions are not free-form text. Each file/module/</text>
+  <text class="small" x="1695" y="1042">function/line is checked against repository structure, then</text>
+  <text class="small" x="1695" y="1066">reported with the evidence chain that explains why it is a</text>
+  <text class="small" x="1695" y="1090">plausible root-cause location.</text>
+
+  <!-- Main arrows -->
+  <path class="arrow" d="M 290 475 L 340 475"/>
+  <path class="arrow" d="M 600 475 L 650 475"/>
+  <path class="arrow" d="M 950 475 L 1000 475"/>
+  <path class="arrow" d="M 1330 475 L 1380 475"/>
+  <path class="arrow" d="M 1740 315 L 1790 315"/>
+  <path class="arrow" d="M 1970 495 L 1970 535"/>
+
+  <!-- Feedback from pruning to graph/router -->
+  <path class="muted-arrow" d="M 1790 390 C 1710 455, 1710 705, 1560 705"/>
+  <text class="tiny" x="1648" y="715">prune / bridge / re-expand</text>
+  <path class="muted-arrow" d="M 1815 235 C 1665 105, 1190 100, 1165 135"/>
+  <text class="tiny" x="1450" y="112">budget feedback to planner</text>
+
+  <!-- Output arrow visual -->
+  <path class="arrow" d="M 1740 675 L 1790 675"/>
+
+  <!-- Legend -->
+  <text class="tiny" x="45" y="1218">White-background vector figure. The framework keeps LLM reasoning in the planning, interpretation, and critique loop, while retrieval, graph expansion, pruning, and schema validation remain deterministic and auditable.</text>
+</svg>

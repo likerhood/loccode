@@ -18,5 +18,7 @@ echo
 echo "[BM25-MMIR full] Done."
 echo "SWE-bench Multimodal metrics:"
 echo "${ROOT_DIR}/results/swebench_multimodal-full-candidates/bm25-mmir/eval/metrics_3level.md"
+echo "${ROOT_DIR}/results/swebench_multimodal-full-candidates/bm25-mmir/eval_strict/metrics_3level.md"
 echo "OmniGIRL metrics:"
 echo "${ROOT_DIR}/results/omnigirl-full-candidates/bm25-mmir/eval/metrics_3level.md"
+echo "${ROOT_DIR}/results/omnigirl-full-candidates/bm25-mmir/eval_strict/metrics_3level.md"

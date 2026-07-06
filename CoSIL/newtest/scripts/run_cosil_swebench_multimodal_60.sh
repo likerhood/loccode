@@ -67,8 +67,9 @@ RESULT_DIR="${TEST_ROOT}/results/${MODEL_TAG}"
 FILE_OUT="${RESULT_DIR}/file_level"
 FUNC_OUT="${RESULT_DIR}/func_level"
 EVAL_DIR="${RESULT_DIR}/eval"
+EVAL_STRICT_DIR="${RESULT_DIR}/eval_strict"
 
-mkdir -p "${DATA_DIR}" "${STRUCTURE_DIR}" "${REPO_WORK_DIR}" "${RESULT_DIR}" "${EVAL_DIR}"
+mkdir -p "${DATA_DIR}" "${STRUCTURE_DIR}" "${REPO_WORK_DIR}" "${RESULT_DIR}" "${EVAL_DIR}" "${EVAL_STRICT_DIR}"
 
 echo "[1/4] Prepare ${BENCHMARK} ${SAMPLE_SIZE}-sample data -> ${TEST_NAME}"
 PREPARE_ARGS=(
@@ -148,4 +149,11 @@ echo "[4/4] Evaluate file-level localization"
   --structure-dir "${STRUCTURE_DIR}" \
   --output-dir "${EVAL_DIR}"
 
+"${PYTHON_BIN}" newtest/scripts/eval_3level_localization_strict.py \
+  --samples "${DATA_DIR}/samples.jsonl" \
+  --pred-file "${FILE_OUT}/loc_outputs.jsonl" \
+  --structure-dir "${STRUCTURE_DIR}" \
+  --output-dir "${EVAL_STRICT_DIR}"
+
 echo "Done: ${EVAL_DIR}/metrics.md"
+echo "Strict three-level metrics: ${EVAL_STRICT_DIR}/metrics_3level.md"

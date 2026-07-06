@@ -11,12 +11,15 @@ DENSE_MODEL="${DENSE_MODEL:-}"
 DENSE_BATCH_SIZE="${DENSE_BATCH_SIZE:-16}"
 DENSE_DEVICE="${DENSE_DEVICE:-}"
 if [[ -z "${PYTHON_BIN:-}" ]]; then
-  if command -v python >/dev/null 2>&1; then
+  if [[ -x /home/like/miniconda3/envs/mmir/bin/python ]]; then
+    PYTHON_BIN=/home/like/miniconda3/envs/mmir/bin/python
+  elif command -v python >/dev/null 2>&1; then
     PYTHON_BIN=python
   elif command -v python3 >/dev/null 2>&1; then
     PYTHON_BIN=python3
   else
-    PYTHON_BIN=/home/like/miniconda3/envs/locagent/bin/python
+    echo "ERROR: no python found. Set PYTHON_BIN=/path/to/python." >&2
+    exit 2
   fi
 fi
 
@@ -39,4 +42,13 @@ export PYTHONPATH="${ROOT_DIR}:${PYTHONPATH:-}"
   --output-dir "${OUTPUT_DIR}/eval" \
   --limit "${LIMIT}"
 
+"${PYTHON_BIN}" -m mmir.evaluation.eval_3level_strict \
+  --samples "${SAMPLE_FILE}" \
+  --predictions "${OUTPUT_DIR}/loc_results.json" \
+  --structure-dir "${STRUCTURE_DIR}" \
+  --output-dir "${OUTPUT_DIR}/eval_strict" \
+  --limit "${LIMIT}"
+
 echo "MM-IR OmniGIRL results: ${OUTPUT_DIR}"
+echo "  relaxed metrics: ${OUTPUT_DIR}/eval/metrics_3level.md"
+echo "  strict metrics:  ${OUTPUT_DIR}/eval_strict/metrics_3level.md"

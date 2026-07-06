@@ -85,6 +85,11 @@ CoSIL/loc_to_patch/
 CoSIL/loc_to_patch_verified/
 CoSIL/generated_patches/
 GALA/mytest/
+!GALA/mytest/
+GALA/mytest/*
+!GALA/mytest/scripts/
+GALA/mytest/scripts/*
+!GALA/mytest/scripts/eval_gala_localization_strict.py
 MM-IR/data/
 MM-IR/results/
 MM-IR/repo_cache/

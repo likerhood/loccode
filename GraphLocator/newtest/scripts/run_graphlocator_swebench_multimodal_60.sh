@@ -62,8 +62,9 @@ REPO_PLAYGROUND="${TEST_ROOT}/repo_playground"
 REPO_SKELETON="${TEST_ROOT}/repo_skeleton"
 RESULT_DIR="${TEST_ROOT}/results/${MODEL_TAG}"
 EVAL_DIR="${RESULT_DIR}/eval"
+EVAL_STRICT_DIR="${RESULT_DIR}/eval_strict"
 
-mkdir -p "${DATA_DIR}" "${REPO_PLAYGROUND}" "${REPO_SKELETON}" "${RESULT_DIR}" "${EVAL_DIR}" "${REPO_ROOT}/datasets"
+mkdir -p "${DATA_DIR}" "${REPO_PLAYGROUND}" "${REPO_SKELETON}" "${RESULT_DIR}" "${EVAL_DIR}" "${EVAL_STRICT_DIR}" "${REPO_ROOT}/datasets"
 
 echo "[1/3] Prepare ${BENCHMARK} ${SAMPLE_SIZE}-sample data -> ${TEST_NAME}"
 PREPARE_ARGS=(
@@ -127,6 +128,13 @@ if [[ -n "${STRUCTURE_DIR}" && -d "${STRUCTURE_DIR}" ]]; then
     --pred-file "${RESULT_DIR}/loc_results.json" \
     --structure-dir "${STRUCTURE_DIR}" \
     --output-dir "${EVAL_DIR}"
+
+  "${PYTHON_BIN}" newtest/scripts/eval_3level_localization_strict.py \
+    --samples "${DATA_DIR}/samples.jsonl" \
+    --pred-file "${RESULT_DIR}/loc_results.json" \
+    --structure-dir "${STRUCTURE_DIR}" \
+    --output-dir "${EVAL_STRICT_DIR}"
 fi
 
 echo "Done: ${EVAL_DIR}/metrics.md"
+echo "Strict three-level metrics: ${EVAL_STRICT_DIR}/metrics_3level.md"

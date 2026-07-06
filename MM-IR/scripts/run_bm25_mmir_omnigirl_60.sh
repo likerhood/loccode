@@ -24,3 +24,4 @@ bash "${ROOT_DIR}/scripts/run_mmir_omnigirl_60.sh" 2>&1 | tee "${LOG_DIR}/run.lo
 
 echo "[BM25-MMIR] OmniGIRL metrics:"
 echo "${OUTPUT_DIR}/eval/metrics_3level.md"
+echo "${OUTPUT_DIR}/eval_strict/metrics_3level.md"

@@ -15,9 +15,13 @@ MODE_TAG="${MODE_TAG:-full-candidates}"
 DATA_DIR="${DATA_DIR:-${MMIR_ROOT}/data/${BENCHMARK}-${MODE_TAG}}"
 SAMPLE_FILE="${SAMPLE_FILE:-${DATA_DIR}/samples.jsonl}"
 STRUCTURE_DIR="${STRUCTURE_DIR:-${DATA_DIR}/repo_structures}"
-OUTPUT_DIR="${OUTPUT_DIR:-${MMIR_ROOT}/results/${BENCHMARK}-${MODE_TAG}/bm25-mmir}"
+METHOD="${METHOD:-bm25-mmir}"
+OUTPUT_DIR="${OUTPUT_DIR:-${MMIR_ROOT}/results/${BENCHMARK}-${MODE_TAG}/${METHOD}}"
 REPO_CACHE_DIR="${REPO_CACHE_DIR:-${MMIR_ROOT}/repo_cache/${BENCHMARK}-${MODE_TAG}}"
 OMNIGIRL_FULL_JSON="${OMNIGIRL_FULL_JSON:-/home/like/locCode/OmniGIRL/omnigirl/harness/benchmark/OmniGIRL.json}"
+DENSE_MODEL="${DENSE_MODEL:-}"
+DENSE_BATCH_SIZE="${DENSE_BATCH_SIZE:-16}"
+DENSE_DEVICE="${DENSE_DEVICE:-}"
 
 LOCAGENT_PYTHON_BIN="${LOCAGENT_PYTHON_BIN:-/home/like/miniconda3/envs/locagent/bin/python}"
 MMIR_PYTHON_BIN="${MMIR_PYTHON_BIN:-/home/like/miniconda3/envs/mmir/bin/python}"
@@ -40,7 +44,7 @@ if [[ "${BENCHMARK}" == "omnigirl" && -z "${SOURCE_JSONL:-}" ]]; then
     exit 1
   fi
   SOURCE_JSONL="${DATA_DIR}/source_omnigirl_full.jsonl"
-  echo "[BM25-MMIR full] converting OmniGIRL full JSON to JSONL: ${SOURCE_JSONL}"
+  echo "[MM-IR full] converting OmniGIRL full JSON to JSONL: ${SOURCE_JSONL}"
   "${LOCAGENT_PYTHON_BIN}" - "${OMNIGIRL_FULL_JSON}" "${SOURCE_JSONL}" <<'PY'
 import json
 import sys
@@ -82,11 +86,12 @@ if [[ -n "${SOURCE_JSONL:-}" ]]; then
   PREPARE_ARGS+=(--source-jsonl "${SOURCE_JSONL}")
 fi
 
-echo "[BM25-MMIR full] 1/4 prepare ${BENCHMARK} data"
-echo "[BM25-MMIR full] sample_size=${SAMPLE_SIZE} (0 means all eligible candidates)"
+echo "[MM-IR full] method=${METHOD}"
+echo "[MM-IR full] 1/4 prepare ${BENCHMARK} data"
+echo "[MM-IR full] sample_size=${SAMPLE_SIZE} (0 means all eligible candidates)"
 "${LOCAGENT_PYTHON_BIN}" "${PREPARE_ARGS[@]}"
 
-echo "[BM25-MMIR full] 2/4 build repo_structures"
+echo "[MM-IR full] 2/4 build repo_structures"
 "${LOCAGENT_PYTHON_BIN}" "${LOCAGENT_ROOT}/newtest/scripts/build_repo_structures.py" \
   --samples "${SAMPLE_FILE}" \
   --output-dir "${STRUCTURE_DIR}" \
@@ -95,21 +100,23 @@ echo "[BM25-MMIR full] 2/4 build repo_structures"
   --split train \
   --skip-existing
 
-export METHOD=bm25-mmir
 export SAMPLE_FILE
 export STRUCTURE_DIR
 export OUTPUT_DIR
 export PYTHON_BIN="${MMIR_PYTHON_BIN}"
 
-echo "[BM25-MMIR full] 3/4 locate"
+echo "[MM-IR full] 3/4 locate"
 "${MMIR_PYTHON_BIN}" -m mmir.cli locate \
   --samples "${SAMPLE_FILE}" \
   --structure-dir "${STRUCTURE_DIR}" \
   --output-dir "${OUTPUT_DIR}" \
-  --method bm25-mmir \
-  --limit 0
+  --method "${METHOD}" \
+  --limit 0 \
+  --dense-model "${DENSE_MODEL}" \
+  --dense-batch-size "${DENSE_BATCH_SIZE}" \
+  --dense-device "${DENSE_DEVICE}"
 
-echo "[BM25-MMIR full] 4/4 evaluate"
+echo "[MM-IR full] 4/4 evaluate relaxed"
 "${MMIR_PYTHON_BIN}" -m mmir.evaluation.eval_3level \
   --samples "${SAMPLE_FILE}" \
   --predictions "${OUTPUT_DIR}/loc_results.json" \
@@ -117,7 +124,16 @@ echo "[BM25-MMIR full] 4/4 evaluate"
   --output-dir "${OUTPUT_DIR}/eval" \
   --limit 0
 
-echo "[BM25-MMIR full] Done"
+echo "[MM-IR full] 4/4 evaluate strict"
+"${MMIR_PYTHON_BIN}" -m mmir.evaluation.eval_3level_strict \
+  --samples "${SAMPLE_FILE}" \
+  --predictions "${OUTPUT_DIR}/loc_results.json" \
+  --structure-dir "${STRUCTURE_DIR}" \
+  --output-dir "${OUTPUT_DIR}/eval_strict" \
+  --limit 0
+
+echo "[MM-IR full] Done"
 echo "Samples: ${SAMPLE_FILE}"
 echo "Structures: ${STRUCTURE_DIR}"
-echo "Metrics: ${OUTPUT_DIR}/eval/metrics_3level.md"
+echo "Relaxed metrics: ${OUTPUT_DIR}/eval/metrics_3level.md"
+echo "Strict metrics:  ${OUTPUT_DIR}/eval_strict/metrics_3level.md"

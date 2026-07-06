@@ -37,12 +37,13 @@ TEST_ROOT="${REPO_ROOT}/newtest/${TEST_NAME}"
 DATA_DIR="${TEST_ROOT}/data"
 OUTPUT_DIR="${TEST_ROOT}/results/${MODEL_TAG}/location"
 EVAL_DIR="${TEST_ROOT}/results/${MODEL_TAG}/eval"
+EVAL_STRICT_DIR="${TEST_ROOT}/results/${MODEL_TAG}/eval_strict"
 # Keep LocAgent's structures isolated from CoSIL/other projects by default.
 # Use LOCAGENT_STRUCTURE_DIR_OVERRIDE only when an explicit cross-project
 # structure directory is intended.
 STRUCTURE_DIR="${LOCAGENT_STRUCTURE_DIR_OVERRIDE:-${TEST_ROOT}/repo_structures}"
 
-mkdir -p "${DATA_DIR}" "${OUTPUT_DIR}" "${EVAL_DIR}"
+mkdir -p "${DATA_DIR}" "${OUTPUT_DIR}" "${EVAL_DIR}" "${EVAL_STRICT_DIR}"
 
 echo "[1/3] Prepare ${BENCHMARK} ${SAMPLE_SIZE}-sample data -> ${TEST_NAME}"
 PREPARE_ARGS=(
@@ -138,6 +139,13 @@ if [[ -n "${STRUCTURE_DIR}" && -d "${STRUCTURE_DIR}" ]]; then
     --pred-file "${OUTPUT_DIR}/merged_loc_outputs_mrr.jsonl" \
     --structure-dir "${STRUCTURE_DIR}" \
     --output-dir "${EVAL_DIR}"
+
+  "${PYTHON_BIN}" newtest/scripts/eval_3level_localization_strict.py \
+    --samples "${DATA_DIR}/samples.jsonl" \
+    --pred-file "${OUTPUT_DIR}/merged_loc_outputs_mrr.jsonl" \
+    --structure-dir "${STRUCTURE_DIR}" \
+    --output-dir "${EVAL_STRICT_DIR}"
 fi
 
 echo "Done: ${EVAL_DIR}/metrics.md"
+echo "Strict three-level metrics: ${EVAL_STRICT_DIR}/metrics_3level.md"

@@ -228,10 +228,32 @@ conda_env_exists() {
   local prefix
   prefix="$(env_prefix "${env_ref}")"
   if [[ -n "${prefix}" ]]; then
-    [[ -d "${prefix}/conda-meta" || -x "${prefix}/bin/python" ]]
+    [[ -e "${prefix}" ]]
   else
     "${CONDA_BIN}" env list | awk '{print $1}' | grep -Fxq "${env_ref}"
   fi
+}
+
+remove_env_or_broken_prefix() {
+  local env_ref="$1"
+  local args prefix
+  mapfile -t args < <(env_args "${env_ref}")
+  prefix="$(env_prefix "${env_ref}")"
+
+  if [[ -n "${prefix}" ]]; then
+    if [[ -d "${prefix}/conda-meta" ]]; then
+      run_cmd "${CONDA_BIN}" env remove -y "${args[@]}"
+      return 0
+    fi
+    if [[ -e "${prefix}" ]]; then
+      echo "[warn] removing broken/non-conda env directory: ${prefix}"
+      run_cmd rm -rf "${prefix}"
+      return 0
+    fi
+    return 0
+  fi
+
+  run_cmd "${CONDA_BIN}" env remove -y "${args[@]}"
 }
 
 ensure_conda() {
@@ -252,7 +274,7 @@ create_env() {
   fi
   if conda_env_exists "${env_ref}"; then
     if [[ "${RECREATE}" == "1" ]]; then
-      run_cmd "${CONDA_BIN}" env remove -y "${args[@]}"
+      remove_env_or_broken_prefix "${env_ref}"
     else
       echo "[skip] conda env exists: $(env_label "${env_ref}")"
       return 0

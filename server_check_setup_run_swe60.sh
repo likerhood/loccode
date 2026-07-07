@@ -81,6 +81,35 @@ env_missing() {
   [[ ! -x "$(env_python "${env_name}")" ]]
 }
 
+graphlocator_env_unhealthy() {
+  local py
+  py="$(env_python graphlocator)"
+  if [[ ! -x "${py}" ]]; then
+    return 0
+  fi
+  if ! "${py}" - <<'PY' >/dev/null 2>&1
+import tree_sitter
+PY
+  then
+    return 0
+  fi
+  if ! "${py}" "${ROOT_DIR}/GraphLocator/newtest/scripts/ensure_tree_sitter_lib.py" --no-build >/dev/null 2>&1; then
+    return 0
+  fi
+  return 1
+}
+
+env_needs_setup() {
+  local env_name="$1"
+  if env_missing "${env_name}"; then
+    return 0
+  fi
+  if [[ "${env_name}" == "graphlocator" ]] && graphlocator_env_unhealthy; then
+    return 0
+  fi
+  return 1
+}
+
 run_logged() {
   local name="$1"
   shift
@@ -260,7 +289,7 @@ require_swe60_inputs_or_explain
 
 if ! is_truthy "${SKIP_SETUP}"; then
   for env_name in ${BASELINE_ENVS}; do
-    if is_truthy "${FORCE_RECREATE_ENVS}" || env_missing "${env_name}"; then
+    if is_truthy "${FORCE_RECREATE_ENVS}" || env_needs_setup "${env_name}"; then
       echo "[setup] ${env_name} needs setup/recreate."
       setup_env "${env_name}"
     else

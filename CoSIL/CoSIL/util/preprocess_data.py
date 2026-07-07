@@ -705,6 +705,22 @@ def clean_method_left_space(method_code: str) -> str:
     # remove indent_space in each line
     return "\n".join([line[indent_space:] for line in method_code.splitlines()])
 
+def _as_lines(value):
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [str(line) for line in value]
+    return str(value).splitlines()
+
+def _slice_lines(file_lines, start_line, end_line):
+    lines = _as_lines(file_lines)
+    try:
+        start = max(1, int(start_line or 1))
+        end = max(start, int(end_line or start))
+    except Exception:
+        return []
+    return lines[start - 1 : end]
+
 def extract_structure(structure, current_path=""):
     """
     Recursively retrieve all file paths, classes, and functions within a directory structure.
@@ -741,7 +757,8 @@ def extract_structure(structure, current_path=""):
                 functions.extend(sub_functions)
             else:
                 next_path = f"{current_path}/{name}" if current_path else name
-                files.append((next_path, content["text"]))
+                file_lines = _as_lines(content.get("text", []))
+                files.append((next_path, file_lines))
                 if "classes" in content:
                     for clazz in content["classes"]:
                         classes.append(
@@ -750,13 +767,19 @@ def extract_structure(structure, current_path=""):
                                 "name": clazz["name"],
                                 "start_line": clazz["start_line"],
                                 "end_line": clazz["end_line"],
-                                "class_content": clazz["text"],
+                                "class_content": _as_lines(
+                                    clazz.get("text")
+                                    or _slice_lines(file_lines, clazz.get("start_line"), clazz.get("end_line"))
+                                ),
                                 "methods": [
                                     {
                                         "name": method["name"],
                                         "start_line": method["start_line"],
                                         "end_line": method["end_line"],
-                                        "method_content":method["text"]
+                                        "method_content": _as_lines(
+                                            method.get("text")
+                                            or _slice_lines(file_lines, method.get("start_line"), method.get("end_line"))
+                                        )
                                     }
                                     for method in clazz.get("methods", [])
                                 ],
@@ -764,6 +787,14 @@ def extract_structure(structure, current_path=""):
                         )
                 if "functions" in content:
                     for function in content["functions"]:
+                        if "text" not in function:
+                            function["text"] = _slice_lines(
+                                file_lines,
+                                function.get("start_line"),
+                                function.get("end_line"),
+                            )
+                        else:
+                            function["text"] = _as_lines(function.get("text"))
                         function["file"] = next_path
                         functions.append(function)
         else:

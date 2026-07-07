@@ -83,6 +83,11 @@ fi
 "${PYTHON_BIN}" "${PREPARE_ARGS[@]}"
 cp "${DATA_DIR}/samples.jsonl" "${REPO_ROOT}/datasets/${DATASET_STEM}.jsonl"
 
+if [[ "${GRAPHLOCATOR_ENSURE_TS_LIB:-1}" == "1" ]]; then
+  echo "[tree-sitter] Ensure GraphLocator language library"
+  "${PYTHON_BIN}" newtest/scripts/ensure_tree_sitter_lib.py
+fi
+
 export GIT_CONFIG_GLOBAL="${TEST_ROOT}/gitconfig"
 touch "${GIT_CONFIG_GLOBAL}"
 GITHUB_URL_PREFIX="${GITHUB_URL_PREFIX:-https://gh.xmly.dev/https://github.com}"

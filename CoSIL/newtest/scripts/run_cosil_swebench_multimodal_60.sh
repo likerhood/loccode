@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+WORKSPACE_ROOT="$(cd "${REPO_ROOT}/.." && pwd)"
 cd "${REPO_ROOT}"
 
 export PYTHONPATH="${PYTHONPATH:-}:${REPO_ROOT}"
@@ -89,14 +90,24 @@ fi
 
 if [[ "${BUILD_STRUCTURES}" == "1" ]]; then
   echo "[2/4] Build repo structures"
+  LOCAGENT_BUILD_STRUCTURES="${LOCAGENT_BUILD_STRUCTURES:-${WORKSPACE_ROOT}/LocAgent/newtest/scripts/build_repo_structures.py}"
+  if [[ ! -f "${LOCAGENT_BUILD_STRUCTURES}" ]]; then
+    echo "ERROR: structure builder not found: ${LOCAGENT_BUILD_STRUCTURES}" >&2
+    echo "Set BUILD_STRUCTURES=0 to reuse an existing STRUCTURE_DIR_OVERRIDE, or check out LocAgent/newtest scripts." >&2
+    exit 2
+  fi
   STRUCTURE_ARGS=(
-    test/swebench-multimodal-60/build_repo_structures.py
+    "${LOCAGENT_BUILD_STRUCTURES}"
     --samples "${DATA_DIR}/samples.jsonl" \
-    --structure-dir "${STRUCTURE_DIR}" \
-    --repo-work-dir "${REPO_WORK_DIR}"
+    --output-dir "${STRUCTURE_DIR}" \
+    --repo-base-dir "${REPO_WORK_DIR}" \
+    --dataset "newtest_${TEST_NAME}" \
+    --split train
   )
   if [[ "${REBUILD_STRUCTURES}" == "1" || "${REBUILD_STRUCTURES}" == "true" ]]; then
-    STRUCTURE_ARGS+=(--force)
+    :
+  else
+    STRUCTURE_ARGS+=(--skip-existing)
   fi
   "${PYTHON_BIN}" "${STRUCTURE_ARGS[@]}"
 else

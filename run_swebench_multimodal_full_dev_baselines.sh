@@ -79,7 +79,7 @@ CANONICAL_ROOT="${ROOT_DIR}/LocAgent/newtest/${EXP_NAME}"
 CANONICAL_DATA_DIR="${CANONICAL_ROOT}/data"
 CANONICAL_SAMPLES="${CANONICAL_DATA_DIR}/samples.jsonl"
 CANONICAL_STRUCTURE_DIR="${CANONICAL_ROOT}/repo_structures"
-COSIL_STRUCTURE_DIR="${COSIL_STRUCTURE_DIR:-${ROOT_DIR}/CoSIL/newtest/${EXP_NAME}/repo_structures}"
+COSIL_STRUCTURE_DIR="${COSIL_STRUCTURE_DIR:-${CANONICAL_STRUCTURE_DIR}}"
 
 env_python_default() {
   local env_name="$1"
@@ -410,7 +410,7 @@ if is_truthy "${RUN_COSIL}"; then
       SOURCE_JSONL='${CANONICAL_SAMPLES}' \
       ALLOW_TEXT_ONLY=1 \
       STRUCTURE_DIR_OVERRIDE='${COSIL_STRUCTURE_DIR}' \
-      BUILD_STRUCTURES='${COSIL_BUILD_STRUCTURES:-1}' \
+      BUILD_STRUCTURES='${COSIL_BUILD_STRUCTURES:-0}' \
       REBUILD_STRUCTURES='${COSIL_REBUILD_STRUCTURES:-0}' \
       bash newtest/scripts/run_cosil_swebench_multimodal_60.sh"
   fi

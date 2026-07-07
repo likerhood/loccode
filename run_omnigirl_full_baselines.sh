@@ -43,7 +43,7 @@ DRY_RUN="${DRY_RUN:-0}"
 
 SOURCE_JSONL="${SOURCE_JSONL:-${ROOT_DIR}/MM-IR/data/omnigirl-full-candidates/samples.jsonl}"
 STRUCTURE_DIR="${STRUCTURE_DIR:-${ROOT_DIR}/MM-IR/data/omnigirl-full-candidates/repo_structures}"
-COSIL_STRUCTURE_DIR="${COSIL_STRUCTURE_DIR:-${ROOT_DIR}/CoSIL/newtest/${EXP_NAME}/repo_structures}"
+COSIL_STRUCTURE_DIR="${COSIL_STRUCTURE_DIR:-${STRUCTURE_DIR}}"
 CONDA_ENV_ROOT="${CONDA_ENV_ROOT:-}"
 
 MODEL_TAG="${MODEL//\//_}"
@@ -349,7 +349,7 @@ if is_truthy "${RUN_COSIL}"; then
         SOURCE_JSONL='${SOURCE_JSONL}' \
         ALLOW_TEXT_ONLY=1 \
         STRUCTURE_DIR_OVERRIDE='${COSIL_STRUCTURE_DIR}' \
-        BUILD_STRUCTURES='${COSIL_BUILD_STRUCTURES:-1}' \
+        BUILD_STRUCTURES='${COSIL_BUILD_STRUCTURES:-0}' \
         REBUILD_STRUCTURES='${COSIL_REBUILD_STRUCTURES:-0}' \
         bash newtest/scripts/run_cosil_swebench_multimodal_60.sh"
   fi

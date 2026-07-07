@@ -67,6 +67,18 @@ check_env_python() {
   fi
 }
 
+check_graphlocator_tree_sitter() {
+  local py="${CONDA_ENV_ROOT%/}/graphlocator/bin/python"
+  if ! "${py}" "${ROOT_DIR}/GraphLocator/newtest/scripts/ensure_tree_sitter_lib.py" --no-build >/dev/null 2>&1; then
+    echo "ERROR: GraphLocator tree-sitter language library is missing or invalid." >&2
+    echo "Repair it with:" >&2
+    echo "  CONDA_SH='${CONDA_SH}' CONDA_ENV_ROOT='${CONDA_ENV_ROOT}' bash setup_baseline_conda_envs.sh --env graphlocator" >&2
+    echo "Or allow this script to run setup first:" >&2
+    echo "  RUN_SETUP=1 CONDA_SH='${CONDA_SH}' CONDA_ENV_ROOT='${CONDA_ENV_ROOT}' bash run_mimo_60_sequential.sh" >&2
+    exit 2
+  fi
+}
+
 run_step() {
   local name="$1"
   shift
@@ -110,6 +122,7 @@ fi
 check_env_python locagent
 check_env_python cosil
 check_env_python graphlocator
+check_graphlocator_tree_sitter
 check_env_python gala
 check_env_python mmir
 

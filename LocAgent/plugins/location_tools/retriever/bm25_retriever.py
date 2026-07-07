@@ -10,7 +10,10 @@ from llama_index.core import Document
 from llama_index.core.node_parser import SimpleFileNodeParser
 from llama_index.core.schema import TextNode
 from llama_index.retrievers.bm25 import BM25Retriever
-from repo_index.index.epic_split import EpicSplitter
+try:
+    from repo_index.index.epic_split import EpicSplitter
+except ModuleNotFoundError:
+    EpicSplitter = None
 
 from dependency_graph import RepoEntitySearcher
 from dependency_graph.traverse_graph import is_test_file
@@ -163,15 +166,17 @@ def build_code_retriever_from_repo(repo_path,
     #     max_chars=3000,  # max chars per chunk
     # )
 
-    splitter = EpicSplitter(
-        min_chunk_size=min_chunk_size,
-        chunk_size=chunk_size,
-        max_chunk_size=max_chunk_size,
-        hard_token_limit=hard_token_limit,
-        max_chunks=max_chunks,
-        repo_path=repo_path,
-    )
-    prepared_nodes = splitter.get_nodes_from_documents(docs, show_progress=show_progress)
+    prepared_nodes = []
+    if EpicSplitter is not None:
+        splitter = EpicSplitter(
+            min_chunk_size=min_chunk_size,
+            chunk_size=chunk_size,
+            max_chunk_size=max_chunk_size,
+            hard_token_limit=hard_token_limit,
+            max_chunks=max_chunks,
+            repo_path=repo_path,
+        )
+        prepared_nodes = splitter.get_nodes_from_documents(docs, show_progress=show_progress)
     if not prepared_nodes:
         prepared_nodes = _build_text_fallback_nodes(docs, repo_path)
     if not prepared_nodes:

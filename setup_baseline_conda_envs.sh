@@ -332,6 +332,15 @@ install_cosil() {
 install_graphlocator() {
   create_env "${GRAPHLOCATOR_ENV}" "${GRAPHLOCATOR_PYTHON_VERSION}"
   pip_install_requirements_if_present "${GRAPHLOCATOR_ENV}" "${ROOT_DIR}/GraphLocator/requirements.txt"
+  # GraphLocator's original repo expected prebuilt tree-sitter language
+  # libraries under rdfs/dependency_graph/lib/. Those binaries are not tracked,
+  # so server clones need to recreate them during setup.
+  if ! pip_install "${GRAPHLOCATOR_ENV}" tree_sitter_languages==1.10.2; then
+    echo "[warn] tree_sitter_languages wheel install failed; will build GraphLocator tree-sitter library from grammar repos."
+  fi
+  local args
+  mapfile -t args < <(env_args "${GRAPHLOCATOR_ENV}")
+  run_cmd "${CONDA_BIN}" run "${args[@]}" python "${ROOT_DIR}/GraphLocator/newtest/scripts/ensure_tree_sitter_lib.py"
   smoke_test "${GRAPHLOCATOR_ENV}" "GraphLocator imports" \
     "import openai, litellm, tree_sitter, networkx, dataclasses_json; print('graphlocator ok')"
 }

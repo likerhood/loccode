@@ -14,6 +14,8 @@ BASELINES="${BASELINES:-locagent cosil graphlocator gala mmir}"
 MAX_PARALLEL_BASELINES="${MAX_PARALLEL_BASELINES:-2}"
 LOG_DIR="${LOG_DIR:-${ROOT_DIR}/baseline_run_logs/omnigirl_full_parallel_$(date +%Y%m%d_%H%M%S)}"
 DRY_RUN="${DRY_RUN:-0}"
+LIVE_LOGS="${LIVE_LOGS:-1}"
+LIVE_LOG_LINES="${LIVE_LOG_LINES:-0}"
 
 is_truthy() {
   [[ "${1:-}" == "1" || "${1:-}" == "true" || "${1:-}" == "yes" ]]
@@ -46,6 +48,7 @@ Baselines: ${BASELINES}
 Max parallel baselines: ${MAX_PARALLEL_BASELINES}
 Log dir: ${LOG_DIR}
 Dry run: ${DRY_RUN}
+Live logs: ${LIVE_LOGS}
 EOF
 
 echo
@@ -59,13 +62,25 @@ run_or_echo env \
   "${MAIN_SCRIPT}"
 
 declare -a PIDS=()
+declare -a TAIL_PIDS=()
 declare -A PID_TO_NAME=()
+declare -A PID_TO_STATUS_FILE=()
+FAILED=0
+
+cleanup_tails() {
+  local tail_pid
+  for tail_pid in "${TAIL_PIDS[@]:-}"; do
+    kill "${tail_pid}" >/dev/null 2>&1 || true
+  done
+}
+
+trap cleanup_tails EXIT INT TERM
 
 active_jobs() {
   local count=0
   local pid
   for pid in "${PIDS[@]:-}"; do
-    if kill -0 "${pid}" >/dev/null 2>&1; then
+    if [[ ! -f "${PID_TO_STATUS_FILE[${pid}]}" ]]; then
       count=$((count + 1))
     fi
   done
@@ -74,9 +89,19 @@ active_jobs() {
 
 compact_jobs() {
   local -a new_pids=()
-  local pid
+  local pid status_file status name
   for pid in "${PIDS[@]:-}"; do
-    if kill -0 "${pid}" >/dev/null 2>&1; then
+    status_file="${PID_TO_STATUS_FILE[${pid}]}"
+    name="${PID_TO_NAME[${pid}]:-${pid}}"
+    if [[ -f "${status_file}" ]]; then
+      status="$(cat "${status_file}" 2>/dev/null || echo 1)"
+      if [[ "${status}" == "0" ]]; then
+        echo "[done] ${name}"
+      else
+        echo "[failed] ${name} exited with status ${status}; see ${LOG_DIR}/${name}.log" >&2
+        FAILED=1
+      fi
+    else
       new_pids+=("${pid}")
     fi
   done
@@ -85,13 +110,8 @@ compact_jobs() {
 
 wait_for_slot() {
   while [[ "$(active_jobs)" -ge "${MAX_PARALLEL_BASELINES}" ]]; do
-    if wait -n; then
-      compact_jobs
-    else
-      local status=$?
-      compact_jobs
-      return "${status}"
-    fi
+    sleep 5
+    compact_jobs
   done
 }
 
@@ -99,21 +119,37 @@ launch_job() {
   local name="$1"
   shift
   local logfile="${LOG_DIR}/${name}.log"
+  local statusfile="${LOG_DIR}/${name}.status"
+  rm -f "${statusfile}"
   echo
   echo "========== Launch ${name} =========="
   echo "[log] ${logfile}"
+  echo "[status] ${statusfile}"
+  echo "[watch] tail -f ${logfile}"
   echo "+ env $* ${MAIN_SCRIPT}"
   if is_truthy "${DRY_RUN}"; then
     return 0
   fi
   (
-    set -euo pipefail
+    set +e
     env "$@" "${MAIN_SCRIPT}"
+    status=$?
+    echo "${status}" >"${statusfile}"
+    exit "${status}"
   ) >"${logfile}" 2>&1 &
   local pid=$!
   PIDS+=("${pid}")
   PID_TO_NAME["${pid}"]="${name}"
+  PID_TO_STATUS_FILE["${pid}"]="${statusfile}"
   echo "[pid] ${pid}"
+  if is_truthy "${LIVE_LOGS}"; then
+    (
+      tail -n "${LIVE_LOG_LINES}" -F "${logfile}" 2>/dev/null | sed -u "s/^/[${name}] /"
+    ) &
+    local tail_pid=$!
+    TAIL_PIDS+=("${tail_pid}")
+    echo "[live-log-pid] ${tail_pid}"
+  fi
 }
 
 for baseline in ${BASELINES}; do
@@ -158,16 +194,9 @@ fi
 
 echo
 echo "========== Waiting for baseline jobs =========="
-FAILED=0
-for pid in "${PIDS[@]:-}"; do
-  name="${PID_TO_NAME[${pid}]:-${pid}}"
-  if wait "${pid}"; then
-    echo "[done] ${name}"
-  else
-    status=$?
-    echo "[failed] ${name} exited with status ${status}; see ${LOG_DIR}/${name}.log" >&2
-    FAILED=1
-  fi
+while [[ "${#PIDS[@]}" -gt 0 ]]; do
+  sleep 5
+  compact_jobs
 done
 
 echo

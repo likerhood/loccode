@@ -18,44 +18,97 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+warn() {
+  echo "[warn] $*" >&2
+}
+
+detect_conda_sh() {
+  local candidate
+  for candidate in \
+    "${HOME}/miniconda3/etc/profile.d/conda.sh" \
+    "${HOME}/anaconda3/etc/profile.d/conda.sh" \
+    "/data2/like/miniconda3/etc/profile.d/conda.sh" \
+    "/opt/conda/etc/profile.d/conda.sh"; do
+    if [[ -f "${candidate}" ]]; then
+      echo "${candidate}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+detect_conda_bin() {
+  local candidate
+  if [[ -n "${CONDA_EXE:-}" && -x "${CONDA_EXE}" ]]; then
+    echo "${CONDA_EXE}"
+    return 0
+  fi
+  if command -v conda >/dev/null 2>&1; then
+    command -v conda
+    return 0
+  fi
+  for candidate in \
+    "${HOME}/miniconda3/bin/conda" \
+    "${HOME}/anaconda3/bin/conda" \
+    "/data2/like/miniconda3/bin/conda" \
+    "/opt/conda/bin/conda"; do
+    if [[ -x "${candidate}" ]]; then
+      echo "${candidate}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+detect_conda_env_root() {
+  local candidate
+  if [[ "${ROOT_DIR}" == /data2/like/* && -d "/data2/like" ]]; then
+    echo "/data2/like/envs"
+    return 0
+  fi
+  for candidate in \
+    "${HOME}/miniconda3/envs" \
+    "${HOME}/anaconda3/envs" \
+    "/data2/like/envs"; do
+    if [[ -d "${candidate}" ]]; then
+      echo "${candidate}"
+      return 0
+    fi
+  done
+  return 1
+}
+
 if [[ -n "${CONDA_SH:-}" ]]; then
   if [[ ! -f "${CONDA_SH}" ]]; then
-    echo "ERROR: CONDA_SH does not exist: ${CONDA_SH}" >&2
-    exit 2
+    warn "CONDA_SH does not exist on this machine: ${CONDA_SH}"
+    warn "Ignoring CONDA_SH and auto-detecting conda for the current machine."
+    unset CONDA_SH
   fi
+fi
+
+if [[ -n "${CONDA_SH:-}" ]]; then
   # shellcheck disable=SC1090
   source "${CONDA_SH}"
-elif [[ -f "${HOME}/miniconda3/etc/profile.d/conda.sh" ]]; then
-  # shellcheck disable=SC1091
-  source "${HOME}/miniconda3/etc/profile.d/conda.sh"
-elif [[ -f "${HOME}/anaconda3/etc/profile.d/conda.sh" ]]; then
-  # shellcheck disable=SC1091
-  source "${HOME}/anaconda3/etc/profile.d/conda.sh"
-elif [[ -f "/opt/conda/etc/profile.d/conda.sh" ]]; then
-  # shellcheck disable=SC1091
-  source "/opt/conda/etc/profile.d/conda.sh"
+else
+  DETECTED_CONDA_SH="$(detect_conda_sh || true)"
+  if [[ -n "${DETECTED_CONDA_SH}" ]]; then
+    # shellcheck disable=SC1090
+    source "${DETECTED_CONDA_SH}"
+  fi
 fi
 
 if [[ -z "${CONDA_BIN:-}" ]]; then
-  if [[ -n "${CONDA_EXE:-}" && -x "${CONDA_EXE}" ]]; then
-    CONDA_BIN="${CONDA_EXE}"
-  elif command -v conda >/dev/null 2>&1; then
-    CONDA_BIN="$(command -v conda)"
-  elif [[ -x "${HOME}/miniconda3/bin/conda" ]]; then
-    CONDA_BIN="${HOME}/miniconda3/bin/conda"
-  elif [[ -x "${HOME}/anaconda3/bin/conda" ]]; then
-    CONDA_BIN="${HOME}/anaconda3/bin/conda"
-  elif [[ -x "/opt/conda/bin/conda" ]]; then
-    CONDA_BIN="/opt/conda/bin/conda"
-  else
-    CONDA_BIN="conda"
-  fi
+  CONDA_BIN="$(detect_conda_bin || true)"
+  CONDA_BIN="${CONDA_BIN:-conda}"
 fi
 PIP_INDEX_URL_ARG=()
 PIP_EXTRA_INDEX_URL_ARG=()
 PIP_RETRIES="${PIP_RETRIES:-10}"
 PIP_TIMEOUT="${PIP_TIMEOUT:-120}"
 PIP_PROGRESS_BAR="${PIP_PROGRESS_BAR:-off}"
+PIP_INSTALL_ATTEMPTS="${PIP_INSTALL_ATTEMPTS:-3}"
+PIP_INSTALL_RETRY_SLEEP="${PIP_INSTALL_RETRY_SLEEP:-10}"
+GRAPHLOCATOR_LIGHTWEIGHT="${GRAPHLOCATOR_LIGHTWEIGHT:-1}"
 
 DRY_RUN=0
 RECREATE=0
@@ -67,7 +120,12 @@ COMMAND_HEARTBEAT_INTERVAL="${COMMAND_HEARTBEAT_INTERVAL:-30}"
 #   CONDA_ENV_ROOT=/data2/like/envs -> /data2/like/envs/mmir
 # Otherwise regular named conda environments are used:
 #   conda create -n mmir ...
-CONDA_ENV_ROOT="${CONDA_ENV_ROOT:-}"
+if [[ -n "${CONDA_ENV_ROOT:-}" && ! -d "$(dirname "${CONDA_ENV_ROOT%/}")" ]]; then
+  warn "CONDA_ENV_ROOT parent does not exist on this machine: $(dirname "${CONDA_ENV_ROOT%/}")"
+  warn "Ignoring CONDA_ENV_ROOT and auto-detecting an env root for the current machine."
+  unset CONDA_ENV_ROOT
+fi
+CONDA_ENV_ROOT="${CONDA_ENV_ROOT:-$(detect_conda_env_root || true)}"
 
 LOCAGENT_ENV="${LOCAGENT_ENV:-locagent}"
 COSIL_ENV="${COSIL_ENV:-cosil}"
@@ -111,6 +169,9 @@ Useful environment variables:
   PIP_RETRIES=10
   PIP_TIMEOUT=120
   PIP_PROGRESS_BAR=off
+  PIP_INSTALL_ATTEMPTS=3
+  PIP_INSTALL_RETRY_SLEEP=10
+  GRAPHLOCATOR_LIGHTWEIGHT=1
   LOCAGENT_ENV=locagent
   COSIL_ENV=cosil
   GRAPHLOCATOR_ENV=graphlocator
@@ -312,15 +373,26 @@ create_env() {
 pip_install() {
   local env_ref="$1"
   shift
-  local args
+  local args attempt
   mapfile -t args < <(env_args "${env_ref}")
-  run_cmd "${CONDA_BIN}" run "${args[@]}" python -m pip install \
-    --retries "${PIP_RETRIES}" \
-    --timeout "${PIP_TIMEOUT}" \
-    --progress-bar "${PIP_PROGRESS_BAR}" \
-    "${PIP_INDEX_URL_ARG[@]}" \
-    "${PIP_EXTRA_INDEX_URL_ARG[@]}" \
-    "$@"
+  for ((attempt = 1; attempt <= PIP_INSTALL_ATTEMPTS; attempt++)); do
+    echo "[pip] install attempt ${attempt}/${PIP_INSTALL_ATTEMPTS}: $*"
+    if run_cmd "${CONDA_BIN}" run "${args[@]}" python -m pip install \
+      --retries "${PIP_RETRIES}" \
+      --timeout "${PIP_TIMEOUT}" \
+      --progress-bar "${PIP_PROGRESS_BAR}" \
+      "${PIP_INDEX_URL_ARG[@]}" \
+      "${PIP_EXTRA_INDEX_URL_ARG[@]}" \
+      "$@"; then
+      return 0
+    fi
+    if [[ "${attempt}" -lt "${PIP_INSTALL_ATTEMPTS}" ]]; then
+      echo "[warn] pip install failed; retrying whole pip command after ${PIP_INSTALL_RETRY_SLEEP}s." >&2
+      sleep "${PIP_INSTALL_RETRY_SLEEP}"
+    fi
+  done
+  echo "ERROR: pip install failed after ${PIP_INSTALL_ATTEMPTS} attempts: $*" >&2
+  return 1
 }
 
 pip_install_requirements_if_present() {
@@ -331,6 +403,24 @@ pip_install_requirements_if_present() {
   else
     echo "[warn] missing requirements file: ${req_file}"
   fi
+}
+
+pip_install_requirements_excluding_if_present() {
+  local env_name="$1"
+  local req_file="$2"
+  local exclude_regex="$3"
+  if [[ ! -f "${req_file}" ]]; then
+    echo "[warn] missing requirements file: ${req_file}"
+    return 0
+  fi
+
+  local filtered_req
+  filtered_req="$(mktemp)"
+  grep -Ev "${exclude_regex}" "${req_file}" > "${filtered_req}"
+  echo "[pip] using filtered requirements: ${req_file}"
+  echo "[pip] excluded pattern: ${exclude_regex}"
+  pip_install "${env_name}" -r "${filtered_req}"
+  rm -f "${filtered_req}"
 }
 
 smoke_test() {
@@ -363,7 +453,14 @@ install_cosil() {
 
 install_graphlocator() {
   create_env "${GRAPHLOCATOR_ENV}" "${GRAPHLOCATOR_PYTHON_VERSION}"
-  pip_install_requirements_if_present "${GRAPHLOCATOR_ENV}" "${ROOT_DIR}/GraphLocator/requirements.txt"
+  if [[ "${GRAPHLOCATOR_LIGHTWEIGHT}" == "1" ]]; then
+    pip_install_requirements_excluding_if_present \
+      "${GRAPHLOCATOR_ENV}" \
+      "${ROOT_DIR}/GraphLocator/requirements.txt" \
+      '^[[:space:]]*torch=='
+  else
+    pip_install_requirements_if_present "${GRAPHLOCATOR_ENV}" "${ROOT_DIR}/GraphLocator/requirements.txt"
+  fi
   pip_install "${GRAPHLOCATOR_ENV}" dataclasses-json
   # GraphLocator's original repo expected prebuilt tree-sitter language
   # libraries under rdfs/dependency_graph/lib/. Those binaries are not tracked,

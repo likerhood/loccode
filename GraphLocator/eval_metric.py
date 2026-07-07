@@ -1,9 +1,11 @@
 import json
-import torch
 import argparse
 import pandas as pd
-from torch import Tensor
 from utils.string_processing import load_jsonl
+
+
+def mean(values):
+    return sum(values) / len(values) if values else 0.0
 
 
 def precision(pred_dict: dict, gt_dict: dict, key):
@@ -27,7 +29,7 @@ def precision(pred_dict: dict, gt_dict: dict, key):
             precisions.append(0.0)
         else:
             precisions.append(relevant_count / len(pred_entities))
-    return torch.tensor(precisions).mean()
+    return mean(precisions)
 
 
 def f1_score(pred_dict: dict, gt_dict: dict, key):
@@ -51,10 +53,10 @@ def f1_score(pred_dict: dict, gt_dict: dict, key):
             f1_scores.append(0)
         else:
             f1_scores.append(2/(len(pred_entities)/ relevant_count + len(gt_entities)/ relevant_count))
-    return torch.tensor(f1_scores).mean()
+    return mean(f1_scores)
 
 
-def recall(pred_dict: dict, gt_dict: dict, key) -> Tensor:
+def recall(pred_dict: dict, gt_dict: dict, key):
     recalls = []
     for instance_id in gt_dict.keys():
         gt_entities = list(set(gt_dict[instance_id][key]))
@@ -71,10 +73,10 @@ def recall(pred_dict: dict, gt_dict: dict, key) -> Tensor:
             if pred_entities[j] in gt_entities:
                 relevant_count += 1
         recalls.append(relevant_count / len(gt_entities))
-    return torch.tensor(recalls).mean()
+    return mean(recalls)
 
 
-def success_location(pred_dict: dict, gt_dict: dict, key) -> Tensor:
+def success_location(pred_dict: dict, gt_dict: dict, key):
     succ_locs = []
     succ_locs_id = []
     for instance_id in gt_dict.keys():
@@ -98,7 +100,7 @@ def success_location(pred_dict: dict, gt_dict: dict, key) -> Tensor:
                 succ_locs_id.append(instance_id)
         else:
             succ_locs.append(0.0)
-    return torch.tensor(succ_locs).mean()
+    return mean(succ_locs)
 
 METRIC_FUNC = {
     'precision': precision,
@@ -123,7 +125,7 @@ def cal_metrics_w_dataset(pred_dict, key, gt_dict, metrics):
         name = METRIC_NAME[metric]
 
         value = metric_func(pred_dict, gt_dict, key)
-        result[name] = round(value.item()*100, 2)
+        result[name] = round(float(value)*100, 2)
 
     return result
 

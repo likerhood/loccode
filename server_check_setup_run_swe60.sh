@@ -23,6 +23,43 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+warn() {
+  echo "[warn] $*" >&2
+}
+
+detect_conda_sh() {
+  local candidate
+  for candidate in \
+    "${HOME}/miniconda3/etc/profile.d/conda.sh" \
+    "${HOME}/anaconda3/etc/profile.d/conda.sh" \
+    "/data2/like/miniconda3/etc/profile.d/conda.sh" \
+    "/opt/conda/etc/profile.d/conda.sh"; do
+    if [[ -f "${candidate}" ]]; then
+      echo "${candidate}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+detect_conda_env_root() {
+  local candidate
+  if [[ "${ROOT_DIR}" == /data2/like/* && -d "/data2/like" ]]; then
+    echo "/data2/like/envs"
+    return 0
+  fi
+  for candidate in \
+    "${HOME}/miniconda3/envs" \
+    "${HOME}/anaconda3/envs" \
+    "/data2/like/envs"; do
+    if [[ -d "${candidate}" ]]; then
+      echo "${candidate}"
+      return 0
+    fi
+  done
+  return 1
+}
+
 ENV_FILE="${ENV_FILE:-${ROOT_DIR}/.env.swe60}"
 if [[ -f "${ENV_FILE}" ]]; then
   # Load local secrets/config. This file is ignored by .gitignore via .env.*.
@@ -32,8 +69,19 @@ if [[ -f "${ENV_FILE}" ]]; then
   set +a
 fi
 
-CONDA_SH="${CONDA_SH:-/data2/like/miniconda3/etc/profile.d/conda.sh}"
-CONDA_ENV_ROOT="${CONDA_ENV_ROOT:-/data2/like/envs}"
+if [[ -n "${CONDA_SH:-}" && ! -f "${CONDA_SH}" ]]; then
+  warn "CONDA_SH does not exist on this machine: ${CONDA_SH}"
+  warn "Ignoring CONDA_SH and auto-detecting conda for the current machine."
+  unset CONDA_SH
+fi
+CONDA_SH="${CONDA_SH:-$(detect_conda_sh || true)}"
+
+if [[ -n "${CONDA_ENV_ROOT:-}" && ! -d "$(dirname "${CONDA_ENV_ROOT%/}")" ]]; then
+  warn "CONDA_ENV_ROOT parent does not exist on this machine: $(dirname "${CONDA_ENV_ROOT%/}")"
+  warn "Ignoring CONDA_ENV_ROOT and auto-detecting an env root for the current machine."
+  unset CONDA_ENV_ROOT
+fi
+CONDA_ENV_ROOT="${CONDA_ENV_ROOT:-$(detect_conda_env_root || true)}"
 BASE_URL="${BASE_URL:-}"
 API_KEY="${API_KEY:-}"
 MODEL_NAME="${MODEL_NAME:-}"

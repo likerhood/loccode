@@ -15,6 +15,7 @@ import json
 import os
 import random
 import re
+import urllib.request
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -44,21 +45,51 @@ def load_records(dataset: str, split: str, source_jsonl: str = "") -> list[dict[
     except Exception as exc:
         if dataset == "SWE-bench/SWE-bench_Multimodal":
             endpoint = os.getenv("HF_ENDPOINT", "https://huggingface.co").rstrip("/")
-            parquet_url = f"{endpoint}/datasets/{dataset}/resolve/main/data/{split}-00000-of-00001.parquet"
+            parquet_urls = [
+                f"{endpoint}/datasets/{dataset}/resolve/main/data/{split}-00000-of-00001.parquet",
+                f"https://huggingface.co/datasets/{dataset}/resolve/main/data/{split}-00000-of-00001.parquet",
+            ]
             print(
-                "[prepare] load_dataset failed; falling back to direct parquet URL: "
-                f"{parquet_url}\n[prepare] original error: {type(exc).__name__}: {exc}",
+                "[prepare] load_dataset failed; falling back to direct parquet download\n"
+                f"[prepare] original error: {type(exc).__name__}: {exc}",
                 flush=True,
             )
-            return [
-                dict(item)
-                for item in load_dataset(
-                    "parquet",
-                    data_files={split: parquet_url},
-                    split=split,
-                )
-            ]
+            return load_swebench_multimodal_parquet_direct(parquet_urls, split)
         raise
+
+
+def load_swebench_multimodal_parquet_direct(urls: list[str], split: str) -> list[dict[str, Any]]:
+    import pandas as pd
+
+    cache_root = Path(os.getenv("HF_HOME") or Path.home() / ".cache" / "huggingface")
+    cache_dir = cache_root / "direct_datasets" / "SWE-bench__SWE-bench_Multimodal"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    parquet_path = cache_dir / f"{split}-00000-of-00001.parquet"
+
+    if not parquet_path.exists() or parquet_path.stat().st_size == 0:
+        errors: list[str] = []
+        seen: set[str] = set()
+        for url in urls:
+            if url in seen:
+                continue
+            seen.add(url)
+            try:
+                print(f"[prepare] downloading parquet: {url}", flush=True)
+                request = urllib.request.Request(url, headers={"User-Agent": "loccode-prepare/1.0"})
+                with urllib.request.urlopen(request, timeout=120) as response:
+                    data = response.read()
+                parquet_path.write_bytes(data)
+                print(f"[prepare] saved parquet: {parquet_path} ({parquet_path.stat().st_size} bytes)", flush=True)
+                break
+            except Exception as download_exc:
+                errors.append(f"{url}: {type(download_exc).__name__}: {download_exc}")
+                if parquet_path.exists():
+                    parquet_path.unlink()
+        else:
+            raise RuntimeError("Failed to download SWE-bench Multimodal parquet:\n" + "\n".join(errors))
+
+    df = pd.read_parquet(parquet_path)
+    return df.to_dict(orient="records")
 
 
 def write_json(path: Path, data: Any) -> None:

@@ -90,7 +90,8 @@ GALA/mytest/
 GALA/mytest/*
 !GALA/mytest/scripts/
 GALA/mytest/scripts/*
-!GALA/mytest/scripts/eval_gala_localization_strict.py
+!GALA/mytest/scripts/*.py
+!GALA/mytest/scripts/*.sh
 MM-IR/data/
 MM-IR/results/
 MM-IR/repo_cache/

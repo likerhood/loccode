@@ -462,6 +462,18 @@ fi
 
 if is_truthy "${RUN_GALA}"; then
   GALA_PRED="${GALA_RESULT_DIR}/loc_results.json"
+  GALA_SWEBENCH_RUNNER="${GALA_SWEBENCH_RUNNER:-mytest/scripts/run_gala_swebench_multimodal_60_localization.sh}"
+  if [[ ! -f "${ROOT_DIR}/GALA/${GALA_SWEBENCH_RUNNER}" ]]; then
+    cat >&2 <<EOF
+ERROR: GALA SWE-bench runner not found:
+  ${ROOT_DIR}/GALA/${GALA_SWEBENCH_RUNNER}
+
+This usually means the repository on this machine is stale or GALA/mytest/scripts
+was not tracked by git. Pull the latest repository, or set GALA_SWEBENCH_RUNNER
+to an existing runner under GALA/.
+EOF
+    exit 2
+  fi
   GALA_EVAL_CMD="cd '${ROOT_DIR}/GALA' && \
       '${GALA_PY}' mytest/scripts/eval_gala_localization.py \
         --result-dir '${GALA_RESULT_DIR}' \
@@ -494,7 +506,7 @@ if is_truthy "${RUN_GALA}"; then
       SEED='${SEED}' \
       ALLOW_MISSING_PATCH=1 \
       STRUCTURE_DIR='${CANONICAL_STRUCTURE_DIR}' \
-      bash mytest/scripts/run_gala_swebench_multimodal_60_localization.sh"
+      bash '${GALA_SWEBENCH_RUNNER}'"
   fi
 fi
 
@@ -523,6 +535,7 @@ if is_truthy "${RUN_MMIR}"; then
         DENSE_MODEL='${MMIR_DENSE_MODEL:-}' \
         DENSE_BATCH_SIZE='${MMIR_DENSE_BATCH_SIZE:-${DENSE_BATCH_SIZE:-16}}' \
         DENSE_DEVICE='${MMIR_DENSE_DEVICE:-${DENSE_DEVICE:-}}' \
+        DENSE_DEVICE_AUTO_FALLBACK='${DENSE_DEVICE_AUTO_FALLBACK:-1}' \
         LIMIT='${MMIR_LIMIT:-0}' \
         SAMPLE_FILE='${CANONICAL_SAMPLES}' \
         STRUCTURE_DIR='${CANONICAL_STRUCTURE_DIR}' \

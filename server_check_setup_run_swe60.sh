@@ -39,6 +39,7 @@ API_KEY="${API_KEY:-}"
 MODEL_NAME="${MODEL_NAME:-}"
 DENSE_DEVICE="${DENSE_DEVICE:-cuda}"
 DENSE_BATCH_SIZE="${DENSE_BATCH_SIZE:-16}"
+DENSE_DEVICE_AUTO_FALLBACK="${DENSE_DEVICE_AUTO_FALLBACK:-1}"
 PARALLEL="${PARALLEL:-0}"
 MAX_PARALLEL_BASELINES="${MAX_PARALLEL_BASELINES:-2}"
 FORCE_RECREATE_ENVS="${FORCE_RECREATE_ENVS:-0}"
@@ -52,6 +53,10 @@ SWE60_INPUT_TAR="${SWE60_INPUT_TAR:-${ROOT_DIR}/swebench_multimodal_60_inputs.ta
 LOG_DIR="${LOG_DIR:-${ROOT_DIR}/logs/server_swe60_$(date +%Y%m%d_%H%M%S)}"
 BASELINE_ENVS="${BASELINE_ENVS:-locagent cosil graphlocator gala mmir}"
 SERVER_HEARTBEAT_INTERVAL="${SERVER_HEARTBEAT_INTERVAL:-30}"
+SERVER_HEARTBEAT_TAIL_LINES="${SERVER_HEARTBEAT_TAIL_LINES:-25}"
+LIVE_LOGS="${LIVE_LOGS:-1}"
+LIVE_LOG_LINES="${LIVE_LOG_LINES:-0}"
+STATUS_INTERVAL="${STATUS_INTERVAL:-${SERVER_HEARTBEAT_INTERVAL}}"
 SWE60_SAMPLES="${ROOT_DIR}/LocAgent/newtest/swebench_multimodal-60/data/samples.jsonl"
 SWE60_STRUCTURES="${ROOT_DIR}/LocAgent/newtest/swebench_multimodal-60/repo_structures"
 
@@ -96,6 +101,7 @@ PY
     return 0
   fi
   if ! "${py}" - <<'PY' >/dev/null 2>&1
+import dataclasses_json
 import tree_sitter
 PY
   then
@@ -142,6 +148,10 @@ run_logged() {
         now="$(date +%s)"
         elapsed=$((now - start))
         echo "[still running][$((elapsed / 60))m$((elapsed % 60))s] ${name}; log=${logfile}"
+        if [[ "${SERVER_HEARTBEAT_TAIL_LINES}" =~ ^[0-9]+$ ]] && [[ "${SERVER_HEARTBEAT_TAIL_LINES}" -gt 0 ]] && [[ -f "${logfile}" ]]; then
+          echo "[recent log:${name}] tail -n ${SERVER_HEARTBEAT_TAIL_LINES} ${logfile}"
+          tail -n "${SERVER_HEARTBEAT_TAIL_LINES}" "${logfile}" | sed "s/^/[${name}] /"
+        fi
       fi
     done
     set +e
@@ -280,9 +290,48 @@ EOF
   exit 2
 }
 
+require_runtime_sources_or_explain() {
+  local missing=0
+  if [[ ! -f "${ROOT_DIR}/GALA/mytest/scripts/run_gala_swebench_multimodal_60_localization.sh" ]]; then
+    echo "ERROR: missing GALA runner: ${ROOT_DIR}/GALA/mytest/scripts/run_gala_swebench_multimodal_60_localization.sh" >&2
+    echo "       Pull the latest repository. This file used to be ignored by .gitignore." >&2
+    missing=1
+  fi
+  if ! grep -q "COSIL_BACKEND_MODEL" "${ROOT_DIR}/CoSIL/CoSIL/util/model.py" 2>/dev/null; then
+    echo "[compat warn] CoSIL source does not contain COSIL_BACKEND_MODEL support." >&2
+    echo "[compat warn] This runner will pass MODEL=${LITELLM_MODEL_NAME}, but you should pull the latest code." >&2
+  fi
+  if ! grep -q "GRAPHLOCATOR_BACKEND_MODEL" "${ROOT_DIR}/GraphLocator/llms/__init__.py" 2>/dev/null; then
+    echo "[compat warn] GraphLocator source does not contain GRAPHLOCATOR_BACKEND_MODEL support." >&2
+    echo "[compat warn] This runner will pass MODEL=${LITELLM_MODEL_NAME}, but you should pull the latest code." >&2
+  fi
+  if [[ "${missing}" == "1" ]]; then
+    exit 2
+  fi
+}
+
 require_nonempty "BASE_URL" "${BASE_URL}"
 require_nonempty "API_KEY" "${API_KEY}"
 require_nonempty "MODEL_NAME" "${MODEL_NAME}"
+
+LITELLM_MODEL_NAME="${LITELLM_MODEL_NAME:-${MODEL_NAME}}"
+if [[ "${LITELLM_MODEL_NAME}" != */* ]]; then
+  LITELLM_MODEL_NAME="openai/${LITELLM_MODEL_NAME}"
+fi
+
+# Older checked-out baseline code did not understand *_BACKEND_MODEL and passed
+# MODEL directly to LiteLLM. If the server has such stale code, use the
+# provider-prefixed model for MODEL as a compatibility fallback instead of
+# failing with "LLM Provider NOT provided".
+RUN_MODEL_NAME="${MODEL_NAME}"
+if ! grep -q "COSIL_BACKEND_MODEL" "${ROOT_DIR}/CoSIL/CoSIL/util/model.py" 2>/dev/null; then
+  echo "[compat warn] CoSIL does not support COSIL_BACKEND_MODEL yet; using MODEL=${LITELLM_MODEL_NAME} for this run." >&2
+  RUN_MODEL_NAME="${LITELLM_MODEL_NAME}"
+fi
+if ! grep -q "GRAPHLOCATOR_BACKEND_MODEL" "${ROOT_DIR}/GraphLocator/llms/__init__.py" 2>/dev/null; then
+  echo "[compat warn] GraphLocator does not support GRAPHLOCATOR_BACKEND_MODEL yet; using MODEL=${LITELLM_MODEL_NAME} for this run." >&2
+  RUN_MODEL_NAME="${LITELLM_MODEL_NAME}"
+fi
 
 mkdir -p "${LOG_DIR}" "${ROOT_DIR}/logs"
 
@@ -293,8 +342,11 @@ Conda sh: ${CONDA_SH}
 Conda env root: ${CONDA_ENV_ROOT}
 Base URL: ${BASE_URL}
 Model: ${MODEL_NAME}
+Run model: ${RUN_MODEL_NAME}
+LiteLLM backend model: ${LITELLM_MODEL_NAME}
 Dense device: ${DENSE_DEVICE}
 Dense batch size: ${DENSE_BATCH_SIZE}
+Dense CUDA auto fallback: ${DENSE_DEVICE_AUTO_FALLBACK}
 Parallel mode: ${PARALLEL}
 Max parallel baselines: ${MAX_PARALLEL_BASELINES}
 Baseline envs: ${BASELINE_ENVS}
@@ -304,6 +356,9 @@ Dry run: ${DRY_RUN}
 Allow HF prepare: ${ALLOW_HF_PREPARE}
 HF dataset endpoint: ${HF_DATASET_API_URL}
 Heartbeat interval: ${SERVER_HEARTBEAT_INTERVAL}s
+Heartbeat tail lines: ${SERVER_HEARTBEAT_TAIL_LINES}
+Inner live logs: ${LIVE_LOGS}
+Inner status interval: ${STATUS_INTERVAL}s
 Log dir: ${LOG_DIR}
 EOF
 
@@ -315,6 +370,7 @@ fi
 
 maybe_unpack_swe60_inputs
 require_swe60_inputs_or_explain
+require_runtime_sources_or_explain
 
 if ! is_truthy "${SKIP_SETUP}"; then
   for env_name in ${BASELINE_ENVS}; do
@@ -345,7 +401,11 @@ run_logged "run_swebench_multimodal_60" \
     CONDA_ENV_ROOT="${CONDA_ENV_ROOT}" \
     OPENAI_API_BASE="${BASE_URL}" \
     OPENAI_API_KEY="${API_KEY}" \
-    MODEL="${MODEL_NAME}" \
+    MODEL="${RUN_MODEL_NAME}" \
+    LITELLM_MODEL="${LITELLM_MODEL_NAME}" \
+    LOCAGENT_BACKEND_MODEL="${LITELLM_MODEL_NAME}" \
+    COSIL_BACKEND_MODEL="${LITELLM_MODEL_NAME}" \
+    GRAPHLOCATOR_BACKEND_MODEL="${LITELLM_MODEL_NAME}" \
     VLM_MODEL="${MODEL_NAME}" \
     TEXT_MODEL_NAME="${MODEL_NAME}" \
     MULADAPTER_MODEL="${MODEL_NAME}" \
@@ -357,7 +417,11 @@ run_logged "run_swebench_multimodal_60" \
     TEXT_API_KEY="${API_KEY}" \
     DENSE_DEVICE="${DENSE_DEVICE}" \
     DENSE_BATCH_SIZE="${DENSE_BATCH_SIZE}" \
+    DENSE_DEVICE_AUTO_FALLBACK="${DENSE_DEVICE_AUTO_FALLBACK}" \
     MAX_PARALLEL_BASELINES="${MAX_PARALLEL_BASELINES}" \
+    LIVE_LOGS="${LIVE_LOGS}" \
+    LIVE_LOG_LINES="${LIVE_LOG_LINES}" \
+    STATUS_INTERVAL="${STATUS_INTERVAL}" \
     DRY_RUN="${DRY_RUN}" \
     bash "${RUN_SCRIPT}"
 

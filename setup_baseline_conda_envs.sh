@@ -352,6 +352,7 @@ install_cosil() {
 install_graphlocator() {
   create_env "${GRAPHLOCATOR_ENV}" "${GRAPHLOCATOR_PYTHON_VERSION}"
   pip_install_requirements_if_present "${GRAPHLOCATOR_ENV}" "${ROOT_DIR}/GraphLocator/requirements.txt"
+  pip_install "${GRAPHLOCATOR_ENV}" dataclasses-json
   # GraphLocator's original repo expected prebuilt tree-sitter language
   # libraries under rdfs/dependency_graph/lib/. Those binaries are not tracked,
   # so server clones need to recreate them during setup.

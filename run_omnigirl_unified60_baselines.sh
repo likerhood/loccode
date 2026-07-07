@@ -286,6 +286,18 @@ if is_truthy "${RUN_GRAPHLOCATOR}"; then
 fi
 
 if is_truthy "${RUN_GALA}"; then
+  GALA_OMNI_RUNNER="${GALA_OMNI_RUNNER:-mytest/scripts/run_gala_omnigirl_js_ts_60_localization.sh}"
+  if [[ ! -f "${ROOT_DIR}/GALA/${GALA_OMNI_RUNNER}" ]]; then
+    cat >&2 <<EOF
+ERROR: GALA OmniGIRL runner not found:
+  ${ROOT_DIR}/GALA/${GALA_OMNI_RUNNER}
+
+This usually means the repository on this machine is stale or GALA/mytest/scripts
+was not tracked by git. Pull the latest repository, or set GALA_OMNI_RUNNER to
+an existing runner under GALA/.
+EOF
+    exit 2
+  fi
   run_if_needed "Run GALA on ${EXP_NAME}" "${GALA_METRICS}|${GALA_STRICT_METRICS}" \
     bash -c "cd '${ROOT_DIR}/GALA' && \
       PYTHON_BIN='${GALA_PY}' \
@@ -302,7 +314,7 @@ if is_truthy "${RUN_GALA}"; then
       ALLOW_NON_GALA_FILES=1 \
       ALLOW_MISSING_PATCH=1 \
       STRUCTURE_DIR='${CANONICAL_STRUCTURE_DIR}' \
-      bash mytest/scripts/run_gala_omnigirl_js_ts_60_localization.sh"
+      bash '${GALA_OMNI_RUNNER}'"
 fi
 
 if is_truthy "${RUN_MMIR}"; then
@@ -313,6 +325,7 @@ if is_truthy "${RUN_MMIR}"; then
       DENSE_MODEL='${MMIR_DENSE_MODEL:-}' \
       DENSE_BATCH_SIZE='${MMIR_DENSE_BATCH_SIZE:-16}' \
       DENSE_DEVICE='${MMIR_DENSE_DEVICE:-${DENSE_DEVICE:-}}' \
+      DENSE_DEVICE_AUTO_FALLBACK='${DENSE_DEVICE_AUTO_FALLBACK:-1}' \
       SAMPLE_FILE='${CANONICAL_SAMPLES}' \
       STRUCTURE_DIR='${CANONICAL_STRUCTURE_DIR}' \
       OUTPUT_DIR='${ROOT_DIR}/MM-IR/results/${EXP_NAME}/${MMIR_METHOD_NAME}' \

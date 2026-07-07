@@ -45,8 +45,14 @@ FORCE_RECREATE_ENVS="${FORCE_RECREATE_ENVS:-0}"
 SKIP_SETUP="${SKIP_SETUP:-0}"
 NO_SMOKE_TEST="${NO_SMOKE_TEST:-0}"
 DRY_RUN="${DRY_RUN:-0}"
+ALLOW_HF_PREPARE="${ALLOW_HF_PREPARE:-auto}"
+HF_DATASET_ID="${HF_DATASET_ID:-SWE-bench/SWE-bench_Multimodal}"
+HF_DATASET_API_URL="${HF_DATASET_API_URL:-https://huggingface.co/api/datasets/${HF_DATASET_ID}}"
+SWE60_INPUT_TAR="${SWE60_INPUT_TAR:-${ROOT_DIR}/swebench_multimodal_60_inputs.tar.gz}"
 LOG_DIR="${LOG_DIR:-${ROOT_DIR}/logs/server_swe60_$(date +%Y%m%d_%H%M%S)}"
 BASELINE_ENVS="${BASELINE_ENVS:-locagent cosil graphlocator gala mmir}"
+SWE60_SAMPLES="${ROOT_DIR}/LocAgent/newtest/swebench_multimodal-60/data/samples.jsonl"
+SWE60_STRUCTURES="${ROOT_DIR}/LocAgent/newtest/swebench_multimodal-60/repo_structures"
 
 is_truthy() {
   [[ "${1:-}" == "1" || "${1:-}" == "true" || "${1:-}" == "yes" ]]
@@ -122,6 +128,101 @@ check_python_or_die() {
   "${py}" -V
 }
 
+count_swe60_samples() {
+  if [[ -f "${SWE60_SAMPLES}" ]]; then
+    wc -l < "${SWE60_SAMPLES}" | tr -d ' '
+  else
+    echo 0
+  fi
+}
+
+count_swe60_structures() {
+  if [[ -d "${SWE60_STRUCTURES}" ]]; then
+    find "${SWE60_STRUCTURES}" -maxdepth 1 -type f -name '*.json' | wc -l | tr -d ' '
+  else
+    echo 0
+  fi
+}
+
+maybe_unpack_swe60_inputs() {
+  local sample_count structure_count
+  sample_count="$(count_swe60_samples)"
+  structure_count="$(count_swe60_structures)"
+  if [[ "${sample_count}" -ge 60 && "${structure_count}" -ge 60 ]]; then
+    return 0
+  fi
+  if [[ -f "${SWE60_INPUT_TAR}" ]]; then
+    echo "[data] Found SWE60 input archive: ${SWE60_INPUT_TAR}"
+    echo "[data] Unpacking it into ${ROOT_DIR}"
+    if ! is_truthy "${DRY_RUN}"; then
+      tar -xzf "${SWE60_INPUT_TAR}" -C "${ROOT_DIR}"
+    fi
+  fi
+}
+
+hf_dataset_available() {
+  if ! command -v curl >/dev/null 2>&1; then
+    return 1
+  fi
+  curl -fsSL --connect-timeout 10 --max-time 30 "${HF_DATASET_API_URL}" >/dev/null 2>&1
+}
+
+require_swe60_inputs_or_explain() {
+  local sample_count structure_count
+  sample_count="$(count_swe60_samples)"
+  structure_count="$(count_swe60_structures)"
+  if [[ "${sample_count}" -ge 60 && "${structure_count}" -ge 60 ]]; then
+    echo "[data] SWE60 local inputs ready: samples=${sample_count}, repo_structures=${structure_count}"
+    return 0
+  fi
+  if is_truthy "${ALLOW_HF_PREPARE}"; then
+    echo "[data] Local SWE60 inputs incomplete: samples=${sample_count}, repo_structures=${structure_count}"
+    echo "[data] ALLOW_HF_PREPARE=1, so the runner may try HuggingFace preparation."
+    return 0
+  fi
+  if [[ "${ALLOW_HF_PREPARE}" == "auto" ]]; then
+    echo "[data] Local SWE60 inputs incomplete: samples=${sample_count}, repo_structures=${structure_count}"
+    echo "[data] Checking HuggingFace dataset endpoint: ${HF_DATASET_API_URL}"
+    if hf_dataset_available; then
+      echo "[data] HuggingFace dataset endpoint is reachable."
+      echo "[data] The runner will download/prepare samples and clone/build repo_structures as needed."
+      return 0
+    fi
+    echo "[data] HuggingFace dataset endpoint is not reachable from this shell."
+  fi
+
+  cat >&2 <<EOF
+ERROR: SWE-bench Multimodal 60 local inputs are incomplete.
+
+Found:
+  samples rows:      ${sample_count}
+  repo_structures:   ${structure_count}
+
+Expected:
+  ${SWE60_SAMPLES}
+  ${SWE60_STRUCTURES}/*.json  (60 files)
+
+Why this matters:
+  The prepared data/repo_structures are intentionally ignored by git because
+  they are large. If they are missing, the runner falls back to HuggingFace.
+  Your server log shows HuggingFace is unavailable or uncached, so preparation
+  fails before any baseline can run.
+
+Recommended fix on the local machine where the data already exists:
+  cd /home/like/locCode
+  bash package_swe60_inputs.sh
+  scp swebench_multimodal_60_inputs.tar.gz <server>:/data2/like/loccode/
+
+Then on the server:
+  cd /data2/like/loccode
+  bash server_check_setup_run_swe60.sh
+
+Alternative, only if the server can access HuggingFace:
+  ALLOW_HF_PREPARE=1 bash server_check_setup_run_swe60.sh
+EOF
+  exit 2
+}
+
 require_nonempty "BASE_URL" "${BASE_URL}"
 require_nonempty "API_KEY" "${API_KEY}"
 require_nonempty "MODEL_NAME" "${MODEL_NAME}"
@@ -143,6 +244,8 @@ Baseline envs: ${BASELINE_ENVS}
 Skip setup: ${SKIP_SETUP}
 Force recreate envs: ${FORCE_RECREATE_ENVS}
 Dry run: ${DRY_RUN}
+Allow HF prepare: ${ALLOW_HF_PREPARE}
+HF dataset endpoint: ${HF_DATASET_API_URL}
 Log dir: ${LOG_DIR}
 EOF
 
@@ -151,6 +254,9 @@ if [[ ! -f "${CONDA_SH}" ]]; then
   echo "Set CONDA_SH=/path/to/miniconda3/etc/profile.d/conda.sh" >&2
   exit 2
 fi
+
+maybe_unpack_swe60_inputs
+require_swe60_inputs_or_explain
 
 if ! is_truthy "${SKIP_SETUP}"; then
   for env_name in ${BASELINE_ENVS}; do

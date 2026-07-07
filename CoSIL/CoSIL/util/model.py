@@ -1,7 +1,36 @@
+import os
 from abc import ABC, abstractmethod
 from typing import Any, List
 
 from litellm import completion, get_model_info
+
+
+def litellm_model_for_request(model: str) -> str:
+    """Return the model name LiteLLM should see for OpenAI-compatible endpoints."""
+    backend_model = (
+        os.environ.get("COSIL_BACKEND_MODEL")
+        or os.environ.get("COSIL_COMPLETION_MODEL")
+        or os.environ.get("LITELLM_MODEL")
+        or model
+    ).strip()
+    if "/" not in backend_model:
+        return f"openai/{backend_model}"
+    return backend_model
+
+
+def litellm_endpoint_kwargs() -> dict[str, str]:
+    kwargs = {}
+    api_base = (
+        os.environ.get("OPENAI_API_BASE")
+        or os.environ.get("OPENAI_BASE_URL")
+        or os.environ.get("LITELLM_API_BASE")
+    )
+    api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("LITELLM_API_KEY")
+    if api_base:
+        kwargs["api_base"] = api_base
+    if api_key:
+        kwargs["api_key"] = api_key
+    return kwargs
 
 
 class DecoderBase(ABC):
@@ -89,10 +118,11 @@ class LiteLLMChatDecoder(DecoderBase):
 
         batch_size = min(self.batch_size, num_samples)
         config = {
-            "model": self.name,
+            "model": litellm_model_for_request(self.name),
             "messages": self._messages(message),
             "temperature": self.temperature,
             "n": batch_size,
+            **litellm_endpoint_kwargs(),
             **self.litellm_kwargs,
             **kwargs,
         }

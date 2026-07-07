@@ -23,6 +23,7 @@ SAMPLE_SIZE="${SAMPLE_SIZE:-60}"
 SEED="${SEED:-20260614}"
 MODEL="${MODEL:-openai/qwen3-vl-8b}"
 MODEL_TAG="${MODEL//\//_}"
+export GRAPHLOCATOR_BACKEND_MODEL="${GRAPHLOCATOR_BACKEND_MODEL:-${MODEL}}"
 SOURCE_JSONL="${SOURCE_JSONL:-}"
 ALLOW_TEXT_ONLY="${ALLOW_TEXT_ONLY:-}"
 DATASET_LANGUAGE="${DATASET_LANGUAGE:-auto}"
@@ -102,6 +103,8 @@ if [[ "${REBUILD_SKELETON}" == "1" || "${REBUILD_SKELETON}" == "true" ]]; then
 fi
 
 echo "[2/3] Run GraphLocator"
+echo "GraphLocator display model: ${MODEL}"
+echo "GraphLocator backend model: ${GRAPHLOCATOR_BACKEND_MODEL}"
 ARGS=(
   --dataset_name "${DATASET_STEM}"
   --dataset_language "${DATASET_LANGUAGE}"

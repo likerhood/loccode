@@ -1,4 +1,5 @@
 import json
+import os
 import time
 from typing import Dict, Union
 
@@ -76,8 +77,19 @@ def request_chatgpt_engine(config, logger, base_url=None, max_retries=40, timeou
     ret = None
     retries = 0
     request_config = dict(config)
+    model = str(request_config.get("model", ""))
+    if model and "/" not in model:
+        request_config["model"] = f"openai/{model}"
+    env_base_url = (
+        os.environ.get("OPENAI_API_BASE")
+        or os.environ.get("OPENAI_BASE_URL")
+        or os.environ.get("LITELLM_API_BASE")
+    )
+    env_api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("LITELLM_API_KEY")
     if base_url is not None:
         request_config["api_base"] = base_url
+    elif env_base_url:
+        request_config["api_base"] = env_base_url
     elif "deepseek" in request_config["model"]:
         request_config["api_base"] = "https://api.deepseek.com/v1"
     elif request_config["model"] == "llama3":
@@ -85,6 +97,8 @@ def request_chatgpt_engine(config, logger, base_url=None, max_retries=40, timeou
         request_config["api_key"] = "token-abc123"
     else:
         request_config["api_base"] = "https://api.siliconflow.cn/v1"
+    if env_api_key and "api_key" not in request_config:
+        request_config["api_key"] = env_api_key
 
     while ret is None and retries < max_retries:
         try:

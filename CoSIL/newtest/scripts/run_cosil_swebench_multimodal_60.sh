@@ -49,6 +49,7 @@ SAMPLE_SIZE="${SAMPLE_SIZE:-60}"
 SEED="${SEED:-20260614}"
 MODEL="${MODEL:-openai/qwen3-vl-8b}"
 MODEL_TAG="${MODEL//\//_}"
+export COSIL_BACKEND_MODEL="${COSIL_BACKEND_MODEL:-${MODEL}}"
 SOURCE_JSONL="${SOURCE_JSONL:-}"
 NUM_THREADS="${NUM_THREADS:-1}"
 RUN_FUNCTION_LEVEL="${RUN_FUNCTION_LEVEL:-0}"
@@ -123,6 +124,8 @@ fi
 export PROJECT_FILE_LOC="${STRUCTURE_DIR}"
 
 echo "[3/4] Run CoSIL file-level localization"
+echo "CoSIL display model: ${MODEL}"
+echo "CoSIL backend model: ${COSIL_BACKEND_MODEL}"
 run_cosil_module "CoSIL.fl.CoSIL_localize_file" \
   --file_level \
   --output_folder "${FILE_OUT}" \

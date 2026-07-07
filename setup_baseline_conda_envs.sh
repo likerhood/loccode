@@ -53,6 +53,9 @@ if [[ -z "${CONDA_BIN:-}" ]]; then
 fi
 PIP_INDEX_URL_ARG=()
 PIP_EXTRA_INDEX_URL_ARG=()
+PIP_RETRIES="${PIP_RETRIES:-10}"
+PIP_TIMEOUT="${PIP_TIMEOUT:-120}"
+PIP_PROGRESS_BAR="${PIP_PROGRESS_BAR:-off}"
 
 DRY_RUN=0
 RECREATE=0
@@ -105,6 +108,9 @@ Useful environment variables:
   CONDA_ENV_ROOT=/data2/like/envs
   PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
   PIP_EXTRA_INDEX_URL=...
+  PIP_RETRIES=10
+  PIP_TIMEOUT=120
+  PIP_PROGRESS_BAR=off
   LOCAGENT_ENV=locagent
   COSIL_ENV=cosil
   GRAPHLOCATOR_ENV=graphlocator
@@ -308,7 +314,13 @@ pip_install() {
   shift
   local args
   mapfile -t args < <(env_args "${env_ref}")
-  run_cmd "${CONDA_BIN}" run "${args[@]}" python -m pip install "${PIP_INDEX_URL_ARG[@]}" "${PIP_EXTRA_INDEX_URL_ARG[@]}" "$@"
+  run_cmd "${CONDA_BIN}" run "${args[@]}" python -m pip install \
+    --retries "${PIP_RETRIES}" \
+    --timeout "${PIP_TIMEOUT}" \
+    --progress-bar "${PIP_PROGRESS_BAR}" \
+    "${PIP_INDEX_URL_ARG[@]}" \
+    "${PIP_EXTRA_INDEX_URL_ARG[@]}" \
+    "$@"
 }
 
 pip_install_requirements_if_present() {

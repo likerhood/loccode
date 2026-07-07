@@ -22,6 +22,7 @@ SAMPLE_SIZE="${SAMPLE_SIZE:-60}"
 SEED="${SEED:-20260614}"
 MODEL="${MODEL:-openai/qwen3-vl-8b}"
 MODEL_TAG="${MODEL//\//_}"
+LOCAGENT_MODEL="${LOCAGENT_MODEL:-}"
 USED_LIST="${USED_LIST:-newtest_instances}"
 SOURCE_JSONL="${SOURCE_JSONL:-}"
 ALLOW_TEXT_ONLY="${ALLOW_TEXT_ONLY:-}"
@@ -44,6 +45,30 @@ EVAL_STRICT_DIR="${TEST_ROOT}/results/${MODEL_TAG}/eval_strict"
 STRUCTURE_DIR="${LOCAGENT_STRUCTURE_DIR_OVERRIDE:-${TEST_ROOT}/repo_structures}"
 
 mkdir -p "${DATA_DIR}" "${OUTPUT_DIR}" "${EVAL_DIR}" "${EVAL_STRICT_DIR}"
+
+locagent_model_choice() {
+  case "$1" in
+    gpt-4o|azure/gpt-4o|openai/gpt-4o-2024-05-13|\
+deepseek/deepseek-chat|deepseek-ai/DeepSeek-R1|\
+litellm_proxy/claude-3-5-sonnet-20241022|litellm_proxy/gpt-4o-2024-05-13|litellm_proxy/o3-mini-2025-01-31|\
+openai/qwen-7B|openai/qwen-7B-128k|openai/ft-qwen-7B|openai/ft-qwen-7B-128k|\
+openai/qwen-32B|openai/qwen-32B-128k|openai/ft-qwen-32B|openai/ft-qwen-32B-128k|\
+openai/qwen9b|openai/qwen3-vl-8b)
+      printf '%s\n' "$1"
+      ;;
+    *)
+      printf '%s\n' "openai/qwen3-vl-8b"
+      ;;
+  esac
+}
+
+if [[ -z "${LOCAGENT_MODEL}" ]]; then
+  LOCAGENT_MODEL="$(locagent_model_choice "${MODEL}")"
+fi
+export LOCAGENT_BACKEND_MODEL="${LOCAGENT_BACKEND_MODEL:-${MODEL}}"
+
+echo "LocAgent internal model: ${LOCAGENT_MODEL}"
+echo "LocAgent backend model: ${LOCAGENT_BACKEND_MODEL}"
 
 echo "[1/3] Prepare ${BENCHMARK} ${SAMPLE_SIZE}-sample data -> ${TEST_NAME}"
 PREPARE_ARGS=(
@@ -109,7 +134,7 @@ LOCALIZE_ARGS=(
   --dataset "${DATA_DIR}/samples.jsonl" \
   --split train \
   --used_list "${USED_LIST}" \
-  --model "${MODEL}" \
+  --model "${LOCAGENT_MODEL}" \
   --localize \
   --merge \
   --output_folder "${OUTPUT_DIR}" \

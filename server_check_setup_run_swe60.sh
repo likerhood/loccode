@@ -88,6 +88,13 @@ graphlocator_env_unhealthy() {
     return 0
   fi
   if ! "${py}" - <<'PY' >/dev/null 2>&1
+import sys
+raise SystemExit(0 if sys.version_info[:2] == (3, 12) else 1)
+PY
+  then
+    return 0
+  fi
+  if ! "${py}" - <<'PY' >/dev/null 2>&1
 import tree_sitter
 PY
   then
@@ -127,7 +134,7 @@ run_logged() {
 setup_env() {
   local env_name="$1"
   local -a args=(--env "${env_name}")
-  if is_truthy "${FORCE_RECREATE_ENVS}" || env_missing "${env_name}"; then
+  if is_truthy "${FORCE_RECREATE_ENVS}" || env_missing "${env_name}" || { [[ "${env_name}" == "graphlocator" ]] && graphlocator_env_unhealthy; }; then
     args+=(--recreate)
   fi
   if is_truthy "${NO_SMOKE_TEST}"; then

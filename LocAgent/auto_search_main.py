@@ -53,6 +53,27 @@ from muladapter.candidate_ranker import extract_file_candidates, format_ranked_s
 # os.environ['LITELLM_LOG'] = 'DEBUG
 
 
+def litellm_model_for_request(model_name: str) -> str:
+    """Return the concrete LiteLLM model used for API requests.
+
+    ``model_name`` is also used by LocAgent to select prompt/tool behavior and
+    is intentionally restricted by argparse. Server runs may use an arbitrary
+    OpenAI-compatible backend model, so allow an environment override without
+    weakening the internal model choices.
+    """
+    backend_model = (
+        os.getenv("LOCAGENT_BACKEND_MODEL")
+        or os.getenv("LOCAGENT_COMPLETION_MODEL")
+        or os.getenv("LITELLM_MODEL")
+        or ""
+    ).strip()
+    if not backend_model:
+        return model_name
+    if "/" not in backend_model:
+        return f"openai/{backend_model}"
+    return backend_model
+
+
 def truncate_observation(text: str) -> str:
     max_chars = int(os.getenv("LOCAGENT_MAX_OBSERVATION_CHARS", "24000"))
     if max_chars <= 0 or len(text) <= max_chars:
@@ -174,6 +195,7 @@ def auto_search_process(result_queue,
                         temp=1.0,
                         max_iteration_num=20,
                         use_function_calling=True):
+    request_model_name = litellm_model_for_request(model_name)
     if tools and ('hosted_vllm' in model_name or 'qwen' in model_name.lower() 
     #             #   or model_name=='azure/gpt-4o' 
     #             #   or model_name == 'litellm_proxy/o3-mini-2025-01-31'
@@ -254,14 +276,14 @@ def auto_search_process(result_queue,
             if tools and ('hosted_vllm' in model_name or 'qwen' in model_name.lower()):
                 messages = convert_fncall_messages_to_non_fncall_messages(messages, tools, add_in_context_learning_example=False)
                 response = litellm.completion(
-                    model=model_name,
+                    model=request_model_name,
                     temperature=temp, top_p=0.8, repetition_penalty=1.05, 
                     messages=messages,
                     stop=NON_FNCALL_STOP_WORDS
                 )
             elif tools:
                 response = litellm.completion(
-                    model=model_name,
+                    model=request_model_name,
                     tools=tools,
                     messages=messages,
                     temperature=temp,
@@ -269,7 +291,7 @@ def auto_search_process(result_queue,
                 )
             else:
                 response = litellm.completion(
-                    model=model_name,
+                    model=request_model_name,
                     messages=messages,
                     temperature=temp,
                     stop=['</execute_ipython>'], #</finish>',

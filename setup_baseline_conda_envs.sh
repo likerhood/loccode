@@ -324,7 +324,7 @@ install_locagent() {
 install_cosil() {
   create_env "${COSIL_ENV}" "${COSIL_PYTHON_VERSION}"
   pip_install_requirements_if_present "${COSIL_ENV}" "${ROOT_DIR}/CoSIL/requirments.txt"
-  pip_install "${COSIL_ENV}" dataclasses-json unidiff tqdm pandas numpy requests python-dotenv
+  pip_install "${COSIL_ENV}" dataclasses-json unidiff tqdm pandas numpy pyarrow requests python-dotenv
   smoke_test "${COSIL_ENV}" "CoSIL imports" \
     "import anthropic, openai, litellm, libcst; print('cosil ok')"
 }
@@ -342,7 +342,7 @@ install_gala() {
   # packages used by the local mytest scripts and src modules.
   pip_install "${GALA_ENV}" \
     openai litellm requests beautifulsoup4 pillow numpy pandas tqdm pydantic \
-    networkx matplotlib python-dotenv datasets tiktoken unidiff dataclasses-json
+    networkx matplotlib python-dotenv datasets pyarrow tiktoken unidiff dataclasses-json
   smoke_test "${GALA_ENV}" "GALA imports" \
     "import openai, requests, PIL, numpy, pandas, tqdm; print('gala ok')"
 }

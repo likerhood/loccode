@@ -39,7 +39,26 @@ def load_records(dataset: str, split: str, source_jsonl: str = "") -> list[dict[
         return load_jsonl(Path(source_jsonl))
     from datasets import load_dataset
 
-    return [dict(item) for item in load_dataset(dataset, split=split)]
+    try:
+        return [dict(item) for item in load_dataset(dataset, split=split)]
+    except Exception as exc:
+        if dataset == "SWE-bench/SWE-bench_Multimodal":
+            endpoint = os.getenv("HF_ENDPOINT", "https://huggingface.co").rstrip("/")
+            parquet_url = f"{endpoint}/datasets/{dataset}/resolve/main/data/{split}-00000-of-00001.parquet"
+            print(
+                "[prepare] load_dataset failed; falling back to direct parquet URL: "
+                f"{parquet_url}\n[prepare] original error: {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+            return [
+                dict(item)
+                for item in load_dataset(
+                    "parquet",
+                    data_files={split: parquet_url},
+                    split=split,
+                )
+            ]
+        raise
 
 
 def write_json(path: Path, data: Any) -> None:

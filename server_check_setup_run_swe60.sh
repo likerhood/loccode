@@ -51,6 +51,7 @@ HF_DATASET_API_URL="${HF_DATASET_API_URL:-https://huggingface.co/api/datasets/${
 SWE60_INPUT_TAR="${SWE60_INPUT_TAR:-${ROOT_DIR}/swebench_multimodal_60_inputs.tar.gz}"
 LOG_DIR="${LOG_DIR:-${ROOT_DIR}/logs/server_swe60_$(date +%Y%m%d_%H%M%S)}"
 BASELINE_ENVS="${BASELINE_ENVS:-locagent cosil graphlocator gala mmir}"
+SERVER_HEARTBEAT_INTERVAL="${SERVER_HEARTBEAT_INTERVAL:-30}"
 SWE60_SAMPLES="${ROOT_DIR}/LocAgent/newtest/swebench_multimodal-60/data/samples.jsonl"
 SWE60_STRUCTURES="${ROOT_DIR}/LocAgent/newtest/swebench_multimodal-60/repo_structures"
 
@@ -127,7 +128,27 @@ run_logged() {
   if is_truthy "${DRY_RUN}"; then
     echo "+ $*"
   else
-    "$@" 2>&1 | tee "${logfile}"
+    echo "+ $*"
+    (
+      set -o pipefail
+      "$@" 2>&1 | tee "${logfile}"
+    ) &
+    local pid status start now elapsed
+    pid=$!
+    start="$(date +%s)"
+    while kill -0 "${pid}" >/dev/null 2>&1; do
+      sleep "${SERVER_HEARTBEAT_INTERVAL}"
+      if kill -0 "${pid}" >/dev/null 2>&1; then
+        now="$(date +%s)"
+        elapsed=$((now - start))
+        echo "[still running][$((elapsed / 60))m$((elapsed % 60))s] ${name}; log=${logfile}"
+      fi
+    done
+    set +e
+    wait "${pid}"
+    status=$?
+    set -e
+    return "${status}"
   fi
 }
 
@@ -282,6 +303,7 @@ Force recreate envs: ${FORCE_RECREATE_ENVS}
 Dry run: ${DRY_RUN}
 Allow HF prepare: ${ALLOW_HF_PREPARE}
 HF dataset endpoint: ${HF_DATASET_API_URL}
+Heartbeat interval: ${SERVER_HEARTBEAT_INTERVAL}s
 Log dir: ${LOG_DIR}
 EOF
 

@@ -16,6 +16,8 @@ LOG_DIR="${LOG_DIR:-${ROOT_DIR}/baseline_run_logs/omnigirl_full_parallel_$(date 
 DRY_RUN="${DRY_RUN:-0}"
 LIVE_LOGS="${LIVE_LOGS:-1}"
 LIVE_LOG_LINES="${LIVE_LOG_LINES:-0}"
+STATUS_INTERVAL="${STATUS_INTERVAL:-30}"
+LAST_STATUS_TS=0
 
 is_truthy() {
   [[ "${1:-}" == "1" || "${1:-}" == "true" || "${1:-}" == "yes" ]]
@@ -49,6 +51,7 @@ Max parallel baselines: ${MAX_PARALLEL_BASELINES}
 Log dir: ${LOG_DIR}
 Dry run: ${DRY_RUN}
 Live logs: ${LIVE_LOGS}
+Status interval: ${STATUS_INTERVAL}s
 EOF
 
 echo
@@ -69,7 +72,7 @@ FAILED=0
 
 cleanup_tails() {
   local tail_pid
-  for tail_pid in "${TAIL_PIDS[@]:-}"; do
+  for tail_pid in "${TAIL_PIDS[@]}"; do
     kill "${tail_pid}" >/dev/null 2>&1 || true
   done
 }
@@ -79,7 +82,7 @@ trap cleanup_tails EXIT INT TERM
 active_jobs() {
   local count=0
   local pid
-  for pid in "${PIDS[@]:-}"; do
+  for pid in "${PIDS[@]}"; do
     if [[ ! -f "${PID_TO_STATUS_FILE[${pid}]}" ]]; then
       count=$((count + 1))
     fi
@@ -90,7 +93,7 @@ active_jobs() {
 compact_jobs() {
   local -a new_pids=()
   local pid status_file status name
-  for pid in "${PIDS[@]:-}"; do
+  for pid in "${PIDS[@]}"; do
     status_file="${PID_TO_STATUS_FILE[${pid}]}"
     name="${PID_TO_NAME[${pid}]:-${pid}}"
     if [[ -f "${status_file}" ]]; then
@@ -105,13 +108,37 @@ compact_jobs() {
       new_pids+=("${pid}")
     fi
   done
-  PIDS=("${new_pids[@]:-}")
+  PIDS=("${new_pids[@]}")
+}
+
+print_running_status() {
+  if ! [[ "${STATUS_INTERVAL}" =~ ^[0-9]+$ ]] || [[ "${STATUS_INTERVAL}" -le 0 ]]; then
+    return 0
+  fi
+  local now
+  now="$(date +%s)"
+  if [[ $((now - LAST_STATUS_TS)) -lt "${STATUS_INTERVAL}" ]]; then
+    return 0
+  fi
+  LAST_STATUS_TS="${now}"
+  if [[ "${#PIDS[@]}" -eq 0 ]]; then
+    return 0
+  fi
+  echo "[status] active baseline jobs:"
+  local pid name
+  for pid in "${PIDS[@]}"; do
+    if [[ ! -f "${PID_TO_STATUS_FILE[${pid}]}" ]]; then
+      name="${PID_TO_NAME[${pid}]:-${pid}}"
+      echo "[status]   ${name}: pid=${pid}, log=${LOG_DIR}/${name}.log"
+    fi
+  done
 }
 
 wait_for_slot() {
   while [[ "$(active_jobs)" -ge "${MAX_PARALLEL_BASELINES}" ]]; do
     sleep 5
     compact_jobs
+    print_running_status
   done
 }
 
@@ -197,6 +224,7 @@ echo "========== Waiting for baseline jobs =========="
 while [[ "${#PIDS[@]}" -gt 0 ]]; do
   sleep 5
   compact_jobs
+  print_running_status
 done
 
 echo

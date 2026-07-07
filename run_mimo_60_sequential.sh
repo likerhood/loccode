@@ -36,6 +36,7 @@ RUN_OMNI60="${RUN_OMNI60:-1}"
 DENSE_DEVICE="${DENSE_DEVICE:-cuda}"
 DENSE_BATCH_SIZE="${DENSE_BATCH_SIZE:-16}"
 LOG_DIR="${LOG_DIR:-${ROOT_DIR}/logs/mimo60_sequential_$(date +%Y%m%d_%H%M%S)}"
+RUN_STEP_HEARTBEAT_INTERVAL="${RUN_STEP_HEARTBEAT_INTERVAL:-30}"
 
 is_truthy() {
   [[ "${1:-}" == "1" || "${1:-}" == "true" || "${1:-}" == "yes" ]]
@@ -86,7 +87,27 @@ run_step() {
   echo
   echo "========== ${name} =========="
   echo "[log] ${logfile}"
-  "$@" 2>&1 | tee "${logfile}"
+  echo "+ $*"
+  (
+    set -o pipefail
+    "$@" 2>&1 | tee "${logfile}"
+  ) &
+  local pid status start now elapsed
+  pid=$!
+  start="$(date +%s)"
+  while kill -0 "${pid}" >/dev/null 2>&1; do
+    sleep "${RUN_STEP_HEARTBEAT_INTERVAL}"
+    if kill -0 "${pid}" >/dev/null 2>&1; then
+      now="$(date +%s)"
+      elapsed=$((now - start))
+      echo "[still running][$((elapsed / 60))m$((elapsed % 60))s] ${name}; log=${logfile}"
+    fi
+  done
+  set +e
+  wait "${pid}"
+  status=$?
+  set -e
+  return "${status}"
 }
 
 require_nonempty "BASE_URL" "${BASE_URL}"
@@ -104,6 +125,7 @@ Model: ${MODEL_NAME}
 Dense device: ${DENSE_DEVICE}
 Dense batch size: ${DENSE_BATCH_SIZE}
 Log dir: ${LOG_DIR}
+Heartbeat interval: ${RUN_STEP_HEARTBEAT_INTERVAL}s
 Run setup: ${RUN_SETUP}
 Run SWE60: ${RUN_SWE60}
 Run Omni60: ${RUN_OMNI60}

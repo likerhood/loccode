@@ -58,6 +58,7 @@ DRY_RUN=0
 RECREATE=0
 RUN_SMOKE_TEST=1
 SELECTED_ENVS=()
+COMMAND_HEARTBEAT_INTERVAL="${COMMAND_HEARTBEAT_INTERVAL:-30}"
 
 # If set, environments are created by prefix under this directory:
 #   CONDA_ENV_ROOT=/data2/like/envs -> /data2/like/envs/mmir
@@ -174,6 +175,25 @@ should_run_env() {
 run_cmd() {
   echo "+ $*"
   if [[ "${DRY_RUN}" != "1" ]]; then
+    if [[ "${COMMAND_HEARTBEAT_INTERVAL}" =~ ^[0-9]+$ && "${COMMAND_HEARTBEAT_INTERVAL}" -gt 0 ]]; then
+      local pid status start now elapsed
+      start="$(date +%s)"
+      "$@" &
+      pid=$!
+      while kill -0 "${pid}" >/dev/null 2>&1; do
+        sleep "${COMMAND_HEARTBEAT_INTERVAL}"
+        if kill -0 "${pid}" >/dev/null 2>&1; then
+          now="$(date +%s)"
+          elapsed=$((now - start))
+          echo "[still running][$((elapsed / 60))m$((elapsed % 60))s] $*"
+        fi
+      done
+      set +e
+      wait "${pid}"
+      status=$?
+      set -e
+      return "${status}"
+    fi
     "$@"
   fi
 }

@@ -35,6 +35,8 @@ RUN_SWE60="${RUN_SWE60:-1}"
 RUN_OMNI60="${RUN_OMNI60:-1}"
 DENSE_DEVICE="${DENSE_DEVICE:-cuda}"
 DENSE_BATCH_SIZE="${DENSE_BATCH_SIZE:-16}"
+API_PREFLIGHT="${API_PREFLIGHT:-1}"
+API_PREFLIGHT_TIMEOUT="${API_PREFLIGHT_TIMEOUT:-30}"
 LOG_DIR="${LOG_DIR:-${ROOT_DIR}/logs/mimo60_sequential_$(date +%Y%m%d_%H%M%S)}"
 RUN_STEP_HEARTBEAT_INTERVAL="${RUN_STEP_HEARTBEAT_INTERVAL:-30}"
 
@@ -133,9 +135,19 @@ Dense batch size: ${DENSE_BATCH_SIZE}
 Log dir: ${LOG_DIR}
 Heartbeat interval: ${RUN_STEP_HEARTBEAT_INTERVAL}s
 Run setup: ${RUN_SETUP}
+API preflight: ${API_PREFLIGHT}
 Run SWE60: ${RUN_SWE60}
 Run Omni60: ${RUN_OMNI60}
 EOF
+
+if is_truthy "${API_PREFLIGHT}"; then
+  run_step "api_preflight" \
+    "${PYTHON:-python3}" "${ROOT_DIR}/scripts/check_openai_compatible_api.py" \
+      --base-url "${BASE_URL}" \
+      --api-key "${API_KEY}" \
+      --model "${LITELLM_MODEL_NAME#openai/}" \
+      --timeout "${API_PREFLIGHT_TIMEOUT}"
+fi
 
 if is_truthy "${RUN_SETUP}"; then
   SETUP_ARGS=()
@@ -174,6 +186,7 @@ COMMON_ENV=(
   TEXT_API_KEY="${API_KEY}"
   DENSE_DEVICE="${DENSE_DEVICE}"
   DENSE_BATCH_SIZE="${DENSE_BATCH_SIZE}"
+  API_PREFLIGHT=0
   MAX_PARALLEL_BASELINES=1
 )
 

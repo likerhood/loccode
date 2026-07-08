@@ -761,6 +761,8 @@ def extract_structure(structure, current_path=""):
                 files.append((next_path, file_lines))
                 if "classes" in content:
                     for clazz in content["classes"]:
+                        if not isinstance(clazz, dict):
+                            continue
                         classes.append(
                             {
                                 "file": next_path,
@@ -782,11 +784,15 @@ def extract_structure(structure, current_path=""):
                                         )
                                     }
                                     for method in clazz.get("methods", [])
+                                    if isinstance(method, dict)
                                 ],
                             }
                         )
                 if "functions" in content:
                     for function in content["functions"]:
+                        if not isinstance(function, dict):
+                            continue
+                        function = dict(function)
                         if "text" not in function:
                             function["text"] = _slice_lines(
                                 file_lines,

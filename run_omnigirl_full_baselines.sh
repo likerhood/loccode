@@ -45,6 +45,8 @@ CLEAN_FULL="${CLEAN_FULL:-0}"
 FORCE_RERUN="${FORCE_RERUN:-0}"
 DRY_RUN="${DRY_RUN:-0}"
 COSIL_MAX_EMPTY_RATE="${COSIL_MAX_EMPTY_RATE:-0.30}"
+API_PREFLIGHT="${API_PREFLIGHT:-0}"
+API_PREFLIGHT_TIMEOUT="${API_PREFLIGHT_TIMEOUT:-30}"
 
 SOURCE_JSONL="${SOURCE_JSONL:-${ROOT_DIR}/MM-IR/data/omnigirl-full-candidates/samples.jsonl}"
 STRUCTURE_DIR="${STRUCTURE_DIR:-${ROOT_DIR}/MM-IR/data/omnigirl-full-candidates/repo_structures}"
@@ -94,6 +96,20 @@ run_shell() {
   if ! is_truthy "${DRY_RUN}"; then
     bash -lc "${script}"
   fi
+}
+
+api_preflight_if_needed() {
+  if ! is_truthy "${API_PREFLIGHT}"; then
+    return 0
+  fi
+  if ! is_truthy "${RUN_LOCAGENT}" && ! is_truthy "${RUN_COSIL}" && ! is_truthy "${RUN_GRAPHLOCATOR}" && ! is_truthy "${RUN_GALA}"; then
+    return 0
+  fi
+  run_step "API preflight" run_cmd "${PYTHON:-python3}" "${ROOT_DIR}/scripts/check_openai_compatible_api.py" \
+    --base-url "${OPENAI_API_BASE}" \
+    --api-key "${OPENAI_API_KEY}" \
+    --model "${LITELLM_MODEL#openai/}" \
+    --timeout "${API_PREFLIGHT_TIMEOUT}"
 }
 
 ensure_python() {
@@ -420,6 +436,8 @@ VLM model: ${VLM_MODEL}
 Text model: ${TEXT_MODEL_NAME}
 Dry run: ${DRY_RUN}
 EOF
+
+api_preflight_if_needed
 
 if is_truthy "${RUN_LOCAGENT}"; then
   LOCAGENT_PRED="${LOCAGENT_RESULT_DIR}/location/merged_loc_outputs_mrr.jsonl"

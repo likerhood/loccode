@@ -105,6 +105,8 @@ RUN_MMIR_METHODS="${RUN_MMIR_METHODS:-bm25-mmir e5-mmir jina-code-v2-mmir codesa
 COSIL_MAX_EMPTY_RATE="${COSIL_MAX_EMPTY_RATE:-0.30}"
 LLM_FAIL_FAST="${LLM_FAIL_FAST:-1}"
 LLM_FAIL_FAST_PATTERNS="${LLM_FAIL_FAST_PATTERNS:-}"
+API_PREFLIGHT="${API_PREFLIGHT:-1}"
+API_PREFLIGHT_TIMEOUT="${API_PREFLIGHT_TIMEOUT:-30}"
 HF_ENDPOINT="${HF_ENDPOINT:-}"
 SERVER_HEARTBEAT_INTERVAL="${SERVER_HEARTBEAT_INTERVAL:-30}"
 SERVER_HEARTBEAT_TAIL_LINES="${SERVER_HEARTBEAT_TAIL_LINES:-25}"
@@ -421,6 +423,7 @@ MM-IR methods: ${RUN_MMIR_METHODS}
 HF endpoint: ${HF_ENDPOINT:-<default>}
 CoSIL max empty rate: ${COSIL_MAX_EMPTY_RATE}
 LLM fail fast: ${LLM_FAIL_FAST}
+API preflight: ${API_PREFLIGHT}
 Skip setup: ${SKIP_SETUP}
 Force recreate envs: ${FORCE_RECREATE_ENVS}
 Dry run: ${DRY_RUN}
@@ -443,6 +446,19 @@ fi
 maybe_unpack_swe60_inputs
 require_swe60_inputs_or_explain
 require_runtime_sources_or_explain
+
+if is_truthy "${API_PREFLIGHT}" && [[ "${BASELINES}" =~ (^|[[:space:]])(locagent|cosil|graphlocator|gala)([[:space:]]|$) ]]; then
+  echo
+  echo "========== API preflight =========="
+  echo "+ ${PYTHON:-python3} ${ROOT_DIR}/scripts/check_openai_compatible_api.py --base-url ${BASE_URL} --api-key <hidden> --model ${LITELLM_MODEL_NAME#openai/} --timeout ${API_PREFLIGHT_TIMEOUT}"
+  if ! is_truthy "${DRY_RUN}"; then
+    "${PYTHON:-python3}" "${ROOT_DIR}/scripts/check_openai_compatible_api.py" \
+    --base-url "${BASE_URL}" \
+    --api-key "${API_KEY}" \
+    --model "${LITELLM_MODEL_NAME#openai/}" \
+    --timeout "${API_PREFLIGHT_TIMEOUT}"
+  fi
+fi
 
 if ! is_truthy "${SKIP_SETUP}"; then
   for env_name in ${BASELINE_ENVS}; do
@@ -481,6 +497,7 @@ run_logged "run_swebench_multimodal_60" \
     COSIL_MAX_EMPTY_RATE="${COSIL_MAX_EMPTY_RATE}" \
     LLM_FAIL_FAST="${LLM_FAIL_FAST}" \
     LLM_FAIL_FAST_PATTERNS="${LLM_FAIL_FAST_PATTERNS}" \
+    API_PREFLIGHT=0 \
     HF_ENDPOINT="${HF_ENDPOINT}" \
     OPENAI_API_BASE="${BASE_URL}" \
     OPENAI_API_KEY="${API_KEY}" \

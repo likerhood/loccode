@@ -32,11 +32,30 @@ VLM_MODEL="${VLM_MODEL:-qwen3-vl-8b}"
 OPENAI_API_BASE="${OPENAI_API_BASE:-http://10.102.65.40:8002/v1}"
 OPENAI_API_KEY="${OPENAI_API_KEY:-dummy}"
 
-LOCAGENT_PY="${LOCAGENT_PY:-/home/like/miniconda3/envs/locagent/bin/python}"
-COSIL_PY="${COSIL_PY:-/home/like/miniconda3/envs/cosil/bin/python}"
-GRAPHLOCATOR_PY="${GRAPHLOCATOR_PY:-/home/like/miniconda3/envs/graphlocator/bin/python}"
-GALA_PY="${GALA_PY:-/home/like/miniconda3/envs/gala/bin/python}"
-MMIR_PY="${MMIR_PY:-/home/like/miniconda3/envs/mmir/bin/python}"
+CONDA_ENV_ROOT="${CONDA_ENV_ROOT:-}"
+
+env_python_default() {
+  local env_name="$1"
+  if [[ -n "${CONDA_ENV_ROOT}" ]]; then
+    echo "${CONDA_ENV_ROOT%/}/${env_name}/bin/python"
+    return 0
+  fi
+  if command -v conda >/dev/null 2>&1; then
+    local base
+    base="$(conda info --base 2>/dev/null || true)"
+    if [[ -n "${base}" && -x "${base}/envs/${env_name}/bin/python" ]]; then
+      echo "${base}/envs/${env_name}/bin/python"
+      return 0
+    fi
+  fi
+  echo ""
+}
+
+LOCAGENT_PY="${LOCAGENT_PY:-$(env_python_default locagent)}"
+COSIL_PY="${COSIL_PY:-$(env_python_default cosil)}"
+GRAPHLOCATOR_PY="${GRAPHLOCATOR_PY:-$(env_python_default graphlocator)}"
+GALA_PY="${GALA_PY:-$(env_python_default gala)}"
+MMIR_PY="${MMIR_PY:-$(env_python_default mmir)}"
 
 RUN_LOCAGENT="${RUN_LOCAGENT:-1}"
 RUN_COSIL="${RUN_COSIL:-1}"
@@ -260,7 +279,8 @@ else
       --repo-base-dir "repo_newtest_${EXP_NAME}" \
       --dataset "newtest_${EXP_NAME}" \
       --split train \
-      --skip-existing
+      --skip-existing \
+      --continue-on-error
   )
 fi
 

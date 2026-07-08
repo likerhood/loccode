@@ -1,7 +1,12 @@
 import logging
 import os
 import subprocess
+import time
 logger = logging.getLogger(__name__)
+
+# 重试配置
+CLONE_MAX_RETRIES = 3
+CLONE_RETRY_DELAY = 5  # 秒
 
 def get_repo_dir_name(repo: str):
     return repo.replace("/", "_")
@@ -22,22 +27,49 @@ def setup_github_repo(repo: str, base_commit: str, base_dir: str = "/tmp/repos")
     return path
 
 
-def maybe_clone(repo_url, repo_dir):
-    if not os.path.exists(f"{repo_dir}/.git"):
-        logger.info(f"Cloning repo '{repo_url}'")
-        # Clone the repo if the directory doesn't exist
-        result = subprocess.run(
-            ["git", "clone", repo_url, repo_dir],
-            check=True,
-            text=True,
-            capture_output=True,
-        )
+def maybe_clone(repo_url, repo_dir, max_retries=CLONE_MAX_RETRIES, retry_delay=CLONE_RETRY_DELAY):
+    """克隆仓库，支持重试机制以应对网络瞬时故障"""
+    if os.path.exists(f"{repo_dir}/.git"):
+        logger.info(f"Repo already exists at '{repo_dir}'")
+        return
 
-        if result.returncode == 0:
-            logger.info(f"Repo '{repo_url}' was cloned to '{repo_dir}'")
-        else:
-            logger.info(f"Failed to clone repo '{repo_url}' to '{repo_dir}'")
-            raise ValueError(f"Failed to clone repo '{repo_url}' to '{repo_dir}'")
+    # 清理可能存在的不完整克隆目录
+    if os.path.exists(repo_dir) and not os.path.exists(f"{repo_dir}/.git"):
+        import shutil
+        logger.warning(f"Removing incomplete clone directory: {repo_dir}")
+        shutil.rmtree(repo_dir, ignore_errors=True)
+
+    for attempt in range(1, max_retries + 1):
+        logger.info(f"Cloning repo '{repo_url}' (attempt {attempt}/{max_retries})")
+        try:
+            result = subprocess.run(
+                ["git", "clone", repo_url, repo_dir],
+                check=True,
+                text=True,
+                capture_output=True,
+            )
+
+            if result.returncode == 0:
+                logger.info(f"Repo '{repo_url}' was cloned to '{repo_dir}'")
+                return
+            else:
+                logger.warning(f"Failed to clone repo '{repo_url}' to '{repo_dir}' (exit code: {result.returncode})")
+        except subprocess.CalledProcessError as e:
+            logger.warning(f"Clone attempt {attempt} failed for '{repo_url}': {e}")
+
+            # 清理失败的克隆目录
+            if os.path.exists(repo_dir):
+                import shutil
+                shutil.rmtree(repo_dir, ignore_errors=True)
+
+            if attempt < max_retries:
+                logger.info(f"Retrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+                # 指数退避：每次重试增加等待时间
+                retry_delay *= 2
+            else:
+                logger.error(f"All {max_retries} clone attempts failed for '{repo_url}'")
+                raise
 
 
 def pull_latest(repo_dir):

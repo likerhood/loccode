@@ -479,7 +479,8 @@ else
       --repo-base-dir 'repo_newtest_${EXP_NAME}' \
       --dataset 'newtest_${EXP_NAME}' \
       --split train \
-      --skip-existing"
+      --skip-existing \
+      --continue-on-error"
 fi
 
 CANONICAL_SAMPLE_COUNT="$(sample_rows)"

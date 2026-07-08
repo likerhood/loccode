@@ -115,6 +115,8 @@ def main() -> None:
     parser.add_argument("--dataset", default="newtest")
     parser.add_argument("--split", default="train")
     parser.add_argument("--skip-existing", action="store_true")
+    parser.add_argument("--continue-on-error", action="store_true",
+                        help="Continue processing other repos even if one fails")
     args = parser.parse_args()
 
     samples = load_jsonl(Path(args.samples))
@@ -122,6 +124,12 @@ def main() -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     repo_base_dir = args.repo_base_dir or os.environ.get("LOCAGENT_REPO_CACHE_DIR", "repo_newtest")
+
+    # 跟踪成功和失败的实例
+    succeeded = []
+    failed = []
+    skipped = []
+
     for index, sample in enumerate(samples, start=1):
         instance_id = str(sample.get("instance_id") or "")
         if not instance_id:
@@ -129,25 +137,61 @@ def main() -> None:
         output_path = output_dir / f"{instance_id}.json"
         if args.skip_existing and output_path.exists():
             print(f"[structure:{index}/{len(samples)}] skip existing {instance_id}", flush=True)
+            skipped.append(instance_id)
             continue
         print(f"[structure:{index}/{len(samples)}] checkout and scan {instance_id}", flush=True)
-        repo_dir = setup_repo(
-            instance_data=sample,
-            repo_base_dir=repo_base_dir,
-            dataset=args.dataset,
-            split=args.split,
-        )
-        structure = build_structure(Path(repo_dir))
-        write_json(
-            output_path,
-            {
-                "instance_id": instance_id,
-                "repo": sample.get("repo", ""),
-                "base_commit": sample.get("base_commit", ""),
-                "structure": structure,
-            },
-        )
-        print(f"[structure:{index}/{len(samples)}] wrote {output_path}", flush=True)
+        try:
+            repo_dir = setup_repo(
+                instance_data=sample,
+                repo_base_dir=repo_base_dir,
+                dataset=args.dataset,
+                split=args.split,
+            )
+            structure = build_structure(Path(repo_dir))
+            write_json(
+                output_path,
+                {
+                    "instance_id": instance_id,
+                    "repo": sample.get("repo", ""),
+                    "base_commit": sample.get("base_commit", ""),
+                    "structure": structure,
+                },
+            )
+            print(f"[structure:{index}/{len(samples)}] wrote {output_path}", flush=True)
+            succeeded.append(instance_id)
+        except Exception as e:
+            error_msg = f"[structure:{index}/{len(samples)}] FAILED {instance_id}: {e}"
+            print(error_msg, flush=True)
+            failed.append({"instance_id": instance_id, "error": str(e)})
+
+            if not args.continue_on_error:
+                print(f"\nStopping due to error. Use --continue-on-error to skip failed repos.", flush=True)
+                # 打印失败摘要
+                _print_summary(succeeded, failed, skipped, len(samples))
+                raise
+
+    # 打印最终摘要
+    _print_summary(succeeded, failed, skipped, len(samples))
+
+    # 如果有失败且不是 continue-on_error 模式，返回非零退出码
+    if failed and not args.continue_on_error:
+        raise SystemExit(1)
+
+
+def _print_summary(succeeded: list, failed: list, skipped: list, total: int) -> None:
+    """打印处理结果摘要"""
+    print("\n" + "=" * 60, flush=True)
+    print(f"Build repo_structures summary:", flush=True)
+    print(f"  Total samples: {total}", flush=True)
+    print(f"  Succeeded:     {len(succeeded)}", flush=True)
+    print(f"  Skipped:       {len(skipped)}", flush=True)
+    print(f"  Failed:        {len(failed)}", flush=True)
+
+    if failed:
+        print(f"\nFailed repositories:", flush=True)
+        for item in failed:
+            print(f"  - {item['instance_id']}: {item['error']}", flush=True)
+    print("=" * 60, flush=True)
 
 
 if __name__ == "__main__":

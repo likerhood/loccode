@@ -24,6 +24,10 @@ SEED="${SEED:-20260614}"
 USED_LIST="${USED_LIST:-newtest_instances}"
 
 MODEL="${MODEL:-openai/qwen3-vl-8b}"
+LITELLM_MODEL="${LITELLM_MODEL:-${MODEL}}"
+if [[ "${LITELLM_MODEL}" != */* ]]; then
+  LITELLM_MODEL="openai/${LITELLM_MODEL}"
+fi
 VLM_MODEL="${VLM_MODEL:-qwen3-vl-8b}"
 OPENAI_API_BASE="${OPENAI_API_BASE:-http://10.102.65.40:8002/v1}"
 OPENAI_API_KEY="${OPENAI_API_KEY:-dummy}"
@@ -221,6 +225,46 @@ else
   )
 fi
 
+if is_truthy "${RUN_LOCAGENT}" || is_truthy "${RUN_COSIL}" || is_truthy "${RUN_GRAPHLOCATOR}" || is_truthy "${RUN_GALA}" || is_truthy "${RUN_MMIR}"; then
+  echo
+  echo "========== Delegate unified60 baseline execution =========="
+  echo "[delegate] Reusing run_omnigirl_full_baselines.sh so resume/eval-only/CoSIL repair logic stays consistent."
+  if [[ -z "${RUN_MMIR_METHODS:-}" ]]; then
+    export RUN_MMIR_METHODS="${MMIR_METHOD_NAME}"
+  fi
+  exec env \
+    EXP_NAME="${EXP_NAME}" \
+    BENCHMARK="${BENCHMARK}" \
+    SAMPLE_SIZE="${SAMPLE_SIZE}" \
+    SEED="${SEED}" \
+    MODEL="${MODEL}" \
+    VLM_MODEL="${VLM_MODEL}" \
+    TEXT_MODEL_NAME="${TEXT_MODEL_NAME:-${VLM_MODEL}}" \
+    OPENAI_API_BASE="${OPENAI_API_BASE}" \
+    OPENAI_API_KEY="${OPENAI_API_KEY}" \
+    SOURCE_JSONL="${CANONICAL_SAMPLES}" \
+    STRUCTURE_DIR="${CANONICAL_STRUCTURE_DIR}" \
+    COSIL_STRUCTURE_DIR="${COSIL_STRUCTURE_DIR}" \
+    LOCAGENT_PY="${LOCAGENT_PY}" \
+    COSIL_PY="${COSIL_PY}" \
+    GRAPHLOCATOR_PY="${GRAPHLOCATOR_PY}" \
+    GALA_PY="${GALA_PY}" \
+    MMIR_PY="${MMIR_PY}" \
+    RUN_LOCAGENT="${RUN_LOCAGENT}" \
+    RUN_COSIL="${RUN_COSIL}" \
+    RUN_GRAPHLOCATOR="${RUN_GRAPHLOCATOR}" \
+    RUN_GALA="${RUN_GALA}" \
+    RUN_MMIR="${RUN_MMIR}" \
+    RUN_MMIR_METHODS="${RUN_MMIR_METHODS}" \
+    FORCE_RERUN="${FORCE_RERUN}" \
+    DRY_RUN="${DRY_RUN:-0}" \
+    "${ROOT_DIR}/run_omnigirl_full_baselines.sh"
+fi
+
+echo
+echo "All baseline execution flags are disabled. Prepared canonical samples/structures only."
+exit 0
+
 if is_truthy "${RUN_LOCAGENT}"; then
   run_if_needed "Run LocAgent on ${EXP_NAME}" "${LOCAGENT_METRICS}|${LOCAGENT_STRICT_METRICS}" \
     bash -c "cd '${ROOT_DIR}/LocAgent' && \
@@ -229,7 +273,7 @@ if is_truthy "${RUN_LOCAGENT}"; then
       OPENAI_API_BASE='${OPENAI_API_BASE}' \
       MODEL='${MODEL}' \
       LOCAGENT_MODEL='${LOCAGENT_MODEL:-}' \
-      LOCAGENT_BACKEND_MODEL='${LOCAGENT_BACKEND_MODEL:-${MODEL}}' \
+      LOCAGENT_BACKEND_MODEL='${LOCAGENT_BACKEND_MODEL:-${LITELLM_MODEL}}' \
       BENCHMARK='${BENCHMARK}' \
       TEST_NAME='${EXP_NAME}' \
       SAMPLE_SIZE='${SAMPLE_SIZE}' \
@@ -252,7 +296,7 @@ if is_truthy "${RUN_COSIL}"; then
       OPENAI_API_KEY='${OPENAI_API_KEY}' \
       OPENAI_API_BASE='${OPENAI_API_BASE}' \
       MODEL='${MODEL}' \
-      COSIL_BACKEND_MODEL='${COSIL_BACKEND_MODEL:-${MODEL}}' \
+      COSIL_BACKEND_MODEL='${COSIL_BACKEND_MODEL:-${LITELLM_MODEL}}' \
       BENCHMARK='${BENCHMARK}' \
       TEST_NAME='${EXP_NAME}' \
       SAMPLE_SIZE='${SAMPLE_SIZE}' \
@@ -272,7 +316,7 @@ if is_truthy "${RUN_GRAPHLOCATOR}"; then
       OPENAI_API_KEY='${OPENAI_API_KEY}' \
       OPENAI_API_BASE='${OPENAI_API_BASE}' \
       MODEL='${MODEL}' \
-      GRAPHLOCATOR_BACKEND_MODEL='${GRAPHLOCATOR_BACKEND_MODEL:-${MODEL}}' \
+      GRAPHLOCATOR_BACKEND_MODEL='${GRAPHLOCATOR_BACKEND_MODEL:-${LITELLM_MODEL}}' \
       BENCHMARK='${BENCHMARK}' \
       TEST_NAME='${EXP_NAME}' \
       SAMPLE_SIZE='${SAMPLE_SIZE}' \

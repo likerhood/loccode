@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import asdict
 from pathlib import Path
 from typing import Iterable
@@ -151,6 +152,7 @@ def run_location(
     samples = load_samples(samples_path)
     if limit:
         samples = samples[:limit]
+    dense_fail_fast = os.environ.get("MMIR_DENSE_FAIL_FAST", "1").strip().lower() not in {"0", "false", "no", "off"}
     if method != "bm25-mmir":
         # Load once before the loop so missing dense dependencies fail loudly
         # instead of producing one empty prediction row per sample.
@@ -184,6 +186,11 @@ def run_location(
                     dense_device=dense_device,
                 )
             except Exception as exc:
+                if method != "bm25-mmir" and dense_fail_fast:
+                    raise RuntimeError(
+                        f"Dense MM-IR failed on {sample.instance_id}. "
+                        "Stop to avoid writing empty dense retrieval rows."
+                    ) from exc
                 row = {
                     "instance_id": sample.instance_id,
                     "repo": sample.repo,

@@ -100,11 +100,18 @@ HF_DATASET_API_URL="${HF_DATASET_API_URL:-https://huggingface.co/api/datasets/${
 SWE60_INPUT_TAR="${SWE60_INPUT_TAR:-${ROOT_DIR}/swebench_multimodal_60_inputs.tar.gz}"
 LOG_DIR="${LOG_DIR:-${ROOT_DIR}/logs/server_swe60_$(date +%Y%m%d_%H%M%S)}"
 BASELINE_ENVS="${BASELINE_ENVS:-locagent cosil graphlocator gala mmir}"
+BASELINES="${BASELINES:-locagent cosil graphlocator gala mmir}"
+RUN_MMIR_METHODS="${RUN_MMIR_METHODS:-bm25-mmir e5-mmir jina-code-v2-mmir codesage-large-v2-mmir coderankembed-mmir}"
+COSIL_MAX_EMPTY_RATE="${COSIL_MAX_EMPTY_RATE:-0.30}"
+LLM_FAIL_FAST="${LLM_FAIL_FAST:-1}"
+LLM_FAIL_FAST_PATTERNS="${LLM_FAIL_FAST_PATTERNS:-}"
+HF_ENDPOINT="${HF_ENDPOINT:-}"
 SERVER_HEARTBEAT_INTERVAL="${SERVER_HEARTBEAT_INTERVAL:-30}"
 SERVER_HEARTBEAT_TAIL_LINES="${SERVER_HEARTBEAT_TAIL_LINES:-25}"
 LIVE_LOGS="${LIVE_LOGS:-1}"
 LIVE_LOG_LINES="${LIVE_LOG_LINES:-0}"
 STATUS_INTERVAL="${STATUS_INTERVAL:-${SERVER_HEARTBEAT_INTERVAL}}"
+FAIL_FAST_ON_BASELINE_FAILURE="${FAIL_FAST_ON_BASELINE_FAILURE:-1}"
 SWE60_SAMPLES="${ROOT_DIR}/LocAgent/newtest/swebench_multimodal-60/data/samples.jsonl"
 SWE60_STRUCTURES="${ROOT_DIR}/LocAgent/newtest/swebench_multimodal-60/repo_structures"
 
@@ -241,6 +248,17 @@ check_python_or_die() {
     exit 2
   fi
   "${py}" -V
+}
+
+baseline_enabled() {
+  local target="$1"
+  local selected
+  for selected in ${BASELINES}; do
+    if [[ "${selected}" == "${target}" ]]; then
+      return 0
+    fi
+  done
+  return 1
 }
 
 count_swe60_samples() {
@@ -398,6 +416,11 @@ Dense CUDA auto fallback: ${DENSE_DEVICE_AUTO_FALLBACK}
 Parallel mode: ${PARALLEL}
 Max parallel baselines: ${MAX_PARALLEL_BASELINES}
 Baseline envs: ${BASELINE_ENVS}
+Baselines to run: ${BASELINES}
+MM-IR methods: ${RUN_MMIR_METHODS}
+HF endpoint: ${HF_ENDPOINT:-<default>}
+CoSIL max empty rate: ${COSIL_MAX_EMPTY_RATE}
+LLM fail fast: ${LLM_FAIL_FAST}
 Skip setup: ${SKIP_SETUP}
 Force recreate envs: ${FORCE_RECREATE_ENVS}
 Dry run: ${DRY_RUN}
@@ -407,6 +430,7 @@ Heartbeat interval: ${SERVER_HEARTBEAT_INTERVAL}s
 Heartbeat tail lines: ${SERVER_HEARTBEAT_TAIL_LINES}
 Inner live logs: ${LIVE_LOGS}
 Inner status interval: ${STATUS_INTERVAL}s
+Fail fast on baseline failure: ${FAIL_FAST_ON_BASELINE_FAILURE}
 Log dir: ${LOG_DIR}
 EOF
 
@@ -447,6 +471,17 @@ fi
 run_logged "run_swebench_multimodal_60" \
   env \
     CONDA_ENV_ROOT="${CONDA_ENV_ROOT}" \
+    BASELINES="${BASELINES}" \
+    RUN_LOCAGENT="$(baseline_enabled locagent && echo 1 || echo 0)" \
+    RUN_COSIL="$(baseline_enabled cosil && echo 1 || echo 0)" \
+    RUN_GRAPHLOCATOR="$(baseline_enabled graphlocator && echo 1 || echo 0)" \
+    RUN_GALA="$(baseline_enabled gala && echo 1 || echo 0)" \
+    RUN_MMIR="$(baseline_enabled mmir && echo 1 || echo 0)" \
+    RUN_MMIR_METHODS="${RUN_MMIR_METHODS}" \
+    COSIL_MAX_EMPTY_RATE="${COSIL_MAX_EMPTY_RATE}" \
+    LLM_FAIL_FAST="${LLM_FAIL_FAST}" \
+    LLM_FAIL_FAST_PATTERNS="${LLM_FAIL_FAST_PATTERNS}" \
+    HF_ENDPOINT="${HF_ENDPOINT}" \
     OPENAI_API_BASE="${BASE_URL}" \
     OPENAI_API_KEY="${API_KEY}" \
     MODEL="${RUN_MODEL_NAME}" \
@@ -470,6 +505,7 @@ run_logged "run_swebench_multimodal_60" \
     LIVE_LOGS="${LIVE_LOGS}" \
     LIVE_LOG_LINES="${LIVE_LOG_LINES}" \
     STATUS_INTERVAL="${STATUS_INTERVAL}" \
+    FAIL_FAST_ON_BASELINE_FAILURE="${FAIL_FAST_ON_BASELINE_FAILURE}" \
     DRY_RUN="${DRY_RUN}" \
     bash "${RUN_SCRIPT}"
 

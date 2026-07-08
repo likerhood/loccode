@@ -11,6 +11,7 @@ DENSE_MODEL="${DENSE_MODEL:-}"
 DENSE_BATCH_SIZE="${DENSE_BATCH_SIZE:-16}"
 DENSE_DEVICE="${DENSE_DEVICE:-}"
 DENSE_DEVICE_AUTO_FALLBACK="${DENSE_DEVICE_AUTO_FALLBACK:-1}"
+MMIR_DENSE_FAIL_FAST="${MMIR_DENSE_FAIL_FAST:-1}"
 if [[ -z "${PYTHON_BIN:-}" ]]; then
   if [[ -x /home/like/miniconda3/envs/mmir/bin/python ]]; then
     PYTHON_BIN=/home/like/miniconda3/envs/mmir/bin/python
@@ -25,6 +26,23 @@ if [[ -z "${PYTHON_BIN:-}" ]]; then
 fi
 
 export PYTHONPATH="${ROOT_DIR}:${PYTHONPATH:-}"
+export MMIR_DENSE_FAIL_FAST
+
+if [[ "${METHOD}" != "bm25-mmir" ]]; then
+  echo "[MM-IR] dense method: ${METHOD}"
+  echo "[MM-IR] dense model override: ${DENSE_MODEL:-<default>}"
+  echo "[MM-IR] dense device requested: ${DENSE_DEVICE:-auto}"
+  echo "[MM-IR] dense batch size: ${DENSE_BATCH_SIZE}"
+  echo "[MM-IR] HF_ENDPOINT: ${HF_ENDPOINT:-<default>}"
+  echo "[MM-IR] TRANSFORMERS_CACHE: ${TRANSFORMERS_CACHE:-<default>}"
+  "${PYTHON_BIN}" - <<'PY'
+import torch
+print("[MM-IR] torch:", torch.__version__)
+print("[MM-IR] torch cuda available:", torch.cuda.is_available())
+print("[MM-IR] torch cuda version:", getattr(torch.version, "cuda", None))
+print("[MM-IR] torch device count:", torch.cuda.device_count())
+PY
+fi
 
 if [[ "${METHOD}" != "bm25-mmir" && "${DENSE_DEVICE}" == cuda* && "${DENSE_DEVICE_AUTO_FALLBACK}" != "0" ]]; then
   if ! "${PYTHON_BIN}" - <<'PY' >/dev/null 2>&1

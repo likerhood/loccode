@@ -74,6 +74,36 @@ def litellm_model_for_request(model_name: str) -> str:
     return backend_model
 
 
+def llm_fail_fast_enabled() -> bool:
+    return os.getenv("LLM_FAIL_FAST", "1").strip().lower() not in {"0", "false", "no", "off"}
+
+
+def llm_fail_fast_patterns() -> list[str]:
+    raw = os.getenv(
+        "LLM_FAIL_FAST_PATTERNS",
+        "insufficient_quota|quota exceeded|quota_exceeded|insufficient balance|no credit|credit exhausted|"
+        "balance not enough|out of quota|余额不足|额度不足|额度已用完|欠费|无可用额度",
+    )
+    return [item.strip().lower() for item in raw.split("|") if item.strip()]
+
+
+def assert_valid_llm_message(message, context: str) -> None:
+    if not llm_fail_fast_enabled():
+        return
+    content = getattr(message, "content", None) or ""
+    tool_calls = getattr(message, "tool_calls", None) or getattr(message, "function_call", None)
+    if not str(content).strip() and tool_calls:
+        return
+    text = str(content).strip()
+    if not text:
+        raise RuntimeError(f"{context}: empty LLM response; stop to avoid writing empty localization results.")
+    lowered = text.lower()
+    for pattern in llm_fail_fast_patterns():
+        if pattern in lowered:
+            preview = text[:500].replace("\n", "\\n")
+            raise RuntimeError(f"{context}: LLM response looks like an API quota/balance failure: {preview}")
+
+
 def truncate_observation(text: str) -> str:
     max_chars = int(os.getenv("LOCAGENT_MAX_OBSERVATION_CHARS", "24000"))
     if max_chars <= 0 or len(text) <= max_chars:
@@ -299,6 +329,18 @@ def auto_search_process(result_queue,
         except litellm.BadRequestError as e:
             # If there's an error, send the error info back to the parent process
             result_queue.put({'error': str(e), 'type': 'BadRequestError'})
+            return
+        except RuntimeError as e:
+            result_queue.put({'error': str(e), 'type': 'RuntimeError'})
+            return
+
+        try:
+            assert_valid_llm_message(
+                response.choices[0].message,
+                f"LocAgent LiteLLM request model={request_model_name}",
+            )
+        except RuntimeError as e:
+            result_queue.put({'error': str(e), 'type': 'RuntimeError'})
             return
         
         if last_message and response.choices[0].message.content == last_message:
@@ -549,6 +591,8 @@ def run_localize(rank, args, bug_queue, log_queue, output_file_lock, traj_file_l
                     if isinstance(result, dict) and 'error' in result and result['type'] == 'BadRequestError':
                         raise litellm.BadRequestError(result['error'], args.model, args.model.split('/')[0])
                         # print(f"Error occurred in subprocess: {result['error']}")
+                    if isinstance(result, dict) and 'error' in result and result['type'] == 'RuntimeError':
+                        raise RuntimeError(result['error'])
                     else:
                         loc_result, messages, traj_data = result
                         
@@ -568,6 +612,8 @@ def run_localize(rank, args, bug_queue, log_queue, output_file_lock, traj_file_l
                     max_attempt_num = max_attempt_num - 1
                     continue
                 except RuntimeError as e:
+                    if "quota/balance failure" in str(e) or "empty LLM response" in str(e):
+                        raise
                     logger.warning(f'{e}. Try next attempt if available.')
                     max_attempt_num = max_attempt_num - 1
                     continue

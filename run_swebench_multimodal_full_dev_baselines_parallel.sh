@@ -28,6 +28,7 @@ DRY_RUN="${DRY_RUN:-0}"
 LIVE_LOGS="${LIVE_LOGS:-1}"
 LIVE_LOG_LINES="${LIVE_LOG_LINES:-0}"
 STATUS_INTERVAL="${STATUS_INTERVAL:-30}"
+FAIL_FAST_ON_BASELINE_FAILURE="${FAIL_FAST_ON_BASELINE_FAILURE:-1}"
 LAST_STATUS_TS=0
 
 is_truthy() {
@@ -63,6 +64,7 @@ Log dir: ${LOG_DIR}
 Dry run: ${DRY_RUN}
 Live logs: ${LIVE_LOGS}
 Status interval: ${STATUS_INTERVAL}s
+Fail fast on baseline failure: ${FAIL_FAST_ON_BASELINE_FAILURE}
 EOF
 
 echo
@@ -86,6 +88,17 @@ cleanup_tails() {
   local tail_pid
   for tail_pid in "${TAIL_PIDS[@]}"; do
     kill "${tail_pid}" >/dev/null 2>&1 || true
+  done
+}
+
+terminate_active_jobs() {
+  local pid name
+  for pid in "${PIDS[@]}"; do
+    if [[ ! -f "${PID_TO_STATUS_FILE[${pid}]}" ]]; then
+      name="${PID_TO_NAME[${pid}]:-${pid}}"
+      echo "[stop] terminating active baseline job ${name} pid=${pid}" >&2
+      kill "${pid}" >/dev/null 2>&1 || true
+    fi
   done
 }
 
@@ -150,6 +163,10 @@ wait_for_slot() {
   while [[ "$(active_jobs)" -ge "${MAX_PARALLEL_BASELINES}" ]]; do
     sleep 5
     compact_jobs
+    if [[ "${FAILED}" != "0" ]] && is_truthy "${FAIL_FAST_ON_BASELINE_FAILURE}"; then
+      terminate_active_jobs
+      return 1
+    fi
     print_running_status
   done
 }
@@ -193,7 +210,9 @@ launch_job() {
 }
 
 for baseline in ${BASELINES}; do
-  wait_for_slot
+  if ! wait_for_slot; then
+    break
+  fi
   case "${baseline}" in
     locagent)
       launch_job "locagent" \
@@ -237,6 +256,10 @@ echo "========== Waiting for baseline jobs =========="
 while [[ "${#PIDS[@]}" -gt 0 ]]; do
   sleep 5
   compact_jobs
+  if [[ "${FAILED}" != "0" ]] && is_truthy "${FAIL_FAST_ON_BASELINE_FAILURE}"; then
+    terminate_active_jobs
+    break
+  fi
   print_running_status
 done
 

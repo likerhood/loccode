@@ -15,6 +15,46 @@ _USAGE_TOTALS = {
 }
 
 
+def _fail_fast_enabled() -> bool:
+    return os.environ.get("LLM_FAIL_FAST", "1").strip().lower() not in {"0", "false", "no", "off"}
+
+
+def _fail_fast_patterns():
+    raw = os.environ.get(
+        "LLM_FAIL_FAST_PATTERNS",
+        "insufficient_quota|quota exceeded|quota_exceeded|insufficient balance|no credit|credit exhausted|"
+        "balance not enough|out of quota|余额不足|额度不足|额度已用完|欠费|无可用额度",
+    )
+    return [item.strip().lower() for item in raw.split("|") if item.strip()]
+
+
+def _extract_first_message_content(response_data):
+    if not isinstance(response_data, dict):
+        return ""
+    choices = response_data.get("choices")
+    if not isinstance(choices, list) or not choices:
+        return ""
+    message = choices[0].get("message") if isinstance(choices[0], dict) else None
+    if not isinstance(message, dict):
+        return ""
+    return message.get("content") or ""
+
+
+def _assert_valid_response_data(response_data, context: str):
+    if not _fail_fast_enabled():
+        return
+    if isinstance(response_data, dict) and response_data.get("error"):
+        raise RuntimeError(f"{context}: API returned error payload: {response_data.get('error')}")
+    text = str(_extract_first_message_content(response_data)).strip()
+    if not text:
+        raise RuntimeError(f"{context}: empty LLM response; stop to avoid writing empty localization results.")
+    lowered = text.lower()
+    for pattern in _fail_fast_patterns():
+        if pattern in lowered:
+            preview = text[:500].replace("\n", "\\n")
+            raise RuntimeError(f"{context}: LLM response looks like an API quota/balance failure: {preview}")
+
+
 def _extract_usage(response_data):
     if not isinstance(response_data, dict):
         return {}
@@ -130,6 +170,7 @@ def send_chat_completion(
             )
             response.raise_for_status()
             response_data = response.json()
+            _assert_valid_response_data(response_data, f"GALA request model={model_name}")
             _record_usage(response_data)
             return response_data
         except (requests.Timeout, requests.ConnectionError, requests.HTTPError) as exc:

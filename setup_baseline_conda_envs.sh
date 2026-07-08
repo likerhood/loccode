@@ -109,10 +109,12 @@ PIP_PROGRESS_BAR="${PIP_PROGRESS_BAR:-off}"
 PIP_INSTALL_ATTEMPTS="${PIP_INSTALL_ATTEMPTS:-3}"
 PIP_INSTALL_RETRY_SLEEP="${PIP_INSTALL_RETRY_SLEEP:-10}"
 GRAPHLOCATOR_LIGHTWEIGHT="${GRAPHLOCATOR_LIGHTWEIGHT:-1}"
+MMIR_INSTALL_CUDA_TORCH="${MMIR_INSTALL_CUDA_TORCH:-0}"
+MMIR_TORCH_INDEX_URL="${MMIR_TORCH_INDEX_URL:-https://download.pytorch.org/whl/cu121}"
 
-DRY_RUN=0
-RECREATE=0
-RUN_SMOKE_TEST=1
+DRY_RUN="${DRY_RUN:-0}"
+RECREATE="${RECREATE:-0}"
+RUN_SMOKE_TEST="${RUN_SMOKE_TEST:-1}"
 SELECTED_ENVS=()
 COMMAND_HEARTBEAT_INTERVAL="${COMMAND_HEARTBEAT_INTERVAL:-30}"
 
@@ -489,6 +491,17 @@ install_gala() {
 install_mmir() {
   create_env "${MMIR_ENV}" "${MMIR_PYTHON_VERSION}"
   pip_install "${MMIR_ENV}" numpy pandas requests tqdm pydantic beautifulsoup4 unidiff
+  if [[ "${MMIR_INSTALL_CUDA_TORCH}" == "1" || "${MMIR_INSTALL_CUDA_TORCH}" == "true" || "${MMIR_INSTALL_CUDA_TORCH}" == "yes" ]]; then
+    local args
+    mapfile -t args < <(env_args "${MMIR_ENV}")
+    echo "[mmir] installing CUDA-enabled torch from ${MMIR_TORCH_INDEX_URL}"
+    run_cmd "${CONDA_BIN}" run "${args[@]}" python -m pip install \
+      --retries "${PIP_RETRIES}" \
+      --timeout "${PIP_TIMEOUT}" \
+      --progress-bar "${PIP_PROGRESS_BAR}" \
+      --index-url "${MMIR_TORCH_INDEX_URL}" \
+      torch
+  fi
   pip_install_requirements_if_present "${MMIR_ENV}" "${ROOT_DIR}/MM-IR/requirements-dense.txt"
   smoke_test "${MMIR_ENV}" "MM-IR dense imports" \
     "import sentence_transformers, transformers, torch, accelerate; print('mmir ok', 'cuda=', torch.cuda.is_available())"

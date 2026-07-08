@@ -50,6 +50,9 @@ SEED="${SEED:-20260614}"
 MODEL="${MODEL:-openai/qwen3-vl-8b}"
 MODEL_TAG="${MODEL//\//_}"
 export COSIL_BACKEND_MODEL="${COSIL_BACKEND_MODEL:-${MODEL}}"
+if [[ "${COSIL_BACKEND_MODEL}" != */* ]]; then
+  export COSIL_BACKEND_MODEL="openai/${COSIL_BACKEND_MODEL}"
+fi
 SOURCE_JSONL="${SOURCE_JSONL:-}"
 NUM_THREADS="${NUM_THREADS:-1}"
 RUN_FUNCTION_LEVEL="${RUN_FUNCTION_LEVEL:-0}"
@@ -130,7 +133,7 @@ run_cosil_module "CoSIL.fl.CoSIL_localize_file" \
   --file_level \
   --output_folder "${FILE_OUT}" \
   --num_threads "${NUM_THREADS}" \
-  --model "${MODEL}" \
+  --model "${COSIL_BACKEND_MODEL}" \
   --dataset "${DATA_DIR}/samples.jsonl" \
   --skip_existing
 
@@ -145,7 +148,7 @@ if [[ "${RUN_FUNCTION_LEVEL}" == "1" ]]; then
     --loc_file "${FILE_OUT}/loc_outputs.jsonl" \
     --output_file "loc_${MODEL_TAG}_func.jsonl" \
     --temperature 0.0 \
-    --model "${MODEL}" \
+    --model "${COSIL_BACKEND_MODEL}" \
     --dataset "${DATA_DIR}/samples.jsonl" \
     --skip_existing \
     --num_threads "${NUM_THREADS}"

@@ -30,6 +30,40 @@ def _litellm_endpoint_kwargs() -> dict:
     return kwargs
 
 
+def _fail_fast_enabled() -> bool:
+    return os.environ.get("LLM_FAIL_FAST", "1").strip().lower() not in {"0", "false", "no", "off"}
+
+
+def _fail_fast_patterns() -> list[str]:
+    raw = os.environ.get(
+        "LLM_FAIL_FAST_PATTERNS",
+        "insufficient_quota|quota exceeded|quota_exceeded|insufficient balance|no credit|credit exhausted|"
+        "balance not enough|out of quota|余额不足|额度不足|额度已用完|欠费|无可用额度",
+    )
+    return [item.strip().lower() for item in raw.split("|") if item.strip()]
+
+
+def _message_has_tool_call(message: dict) -> bool:
+    tool_calls = message.get("tool_calls") or message.get("function_call")
+    return bool(tool_calls)
+
+
+def _assert_valid_llm_message(message: dict, context: str) -> None:
+    if not _fail_fast_enabled():
+        return
+    content = message.get("content") or ""
+    if not str(content).strip() and _message_has_tool_call(message):
+        return
+    text = str(content).strip()
+    if not text:
+        raise RuntimeError(f"{context}: empty LLM response; stop to avoid writing empty localization results.")
+    lowered = text.lower()
+    for pattern in _fail_fast_patterns():
+        if pattern in lowered:
+            preview = text[:500].replace("\n", "\\n")
+            raise RuntimeError(f"{context}: LLM response looks like an API quota/balance failure: {preview}")
+
+
 def get_llm_response(model_name: str, messages, with_tool=False, tools=None,
                      temperature=0.0, n=1, max_completion_tokens=8192):
     """
@@ -78,6 +112,8 @@ def get_llm_response(model_name: str, messages, with_tool=False, tools=None,
 
     llm_response = _call_model(model_name, messages, temperature, tool_list)
     decoded_answer = [choice["message"].to_dict() for choice in llm_response.choices]
+    for answer in decoded_answer:
+        _assert_valid_llm_message(answer, f"GraphLocator LiteLLM request model={request_model_name}")
     finish_reason = [choice["finish_reason"] for choice in llm_response.choices]
     usage = llm_response.usage.to_dict() if hasattr(llm_response, "usage") else {}
     return decoded_answer, finish_reason, usage

@@ -44,6 +44,10 @@ SEED="${SEED:-20260614}"
 USED_LIST="${USED_LIST:-swebench_multimodal_full_dev_instances}"
 
 MODEL="${MODEL:-openai/qwen3-vl-8b}"
+LITELLM_MODEL="${LITELLM_MODEL:-${MODEL}}"
+if [[ "${LITELLM_MODEL}" != */* ]]; then
+  LITELLM_MODEL="openai/${LITELLM_MODEL}"
+fi
 VLM_MODEL="${VLM_MODEL:-qwen3-vl-8b}"
 TEXT_MODEL_NAME="${TEXT_MODEL_NAME:-${VLM_MODEL}}"
 OPENAI_API_BASE="${OPENAI_API_BASE:-http://10.102.65.40:8002/v1}"
@@ -68,6 +72,7 @@ FORCE_RERUN="${FORCE_RERUN:-0}"
 FORCE_PREPARE="${FORCE_PREPARE:-0}"
 FORCE_STRUCTURES="${FORCE_STRUCTURES:-0}"
 DRY_RUN="${DRY_RUN:-0}"
+COSIL_MAX_EMPTY_RATE="${COSIL_MAX_EMPTY_RATE:-0.30}"
 
 SOURCE_JSONL="${SOURCE_JSONL:-}"
 CONDA_ENV_ROOT="${CONDA_ENV_ROOT:-}"
@@ -223,6 +228,44 @@ metrics_complete() {
   [[ -s "${dir}/eval/metrics_3level.md" && -s "${dir}/eval_strict/metrics_3level.md" ]]
 }
 
+prediction_rows() {
+  local pred_file="$1"
+  local python_bin="${2:-python3}"
+  if [[ ! -s "${pred_file}" ]]; then
+    echo 0
+    return 0
+  fi
+  "${python_bin}" - "$pred_file" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+if path.suffix == ".jsonl":
+    with path.open("r", encoding="utf-8", errors="ignore") as fh:
+        print(sum(1 for line in fh if line.strip()))
+    raise SystemExit
+
+try:
+    data = json.loads(path.read_text(encoding="utf-8"))
+except Exception:
+    print(0)
+    raise SystemExit
+
+if isinstance(data, list):
+    print(len(data))
+elif isinstance(data, dict):
+    if isinstance(data.get("results"), list):
+        print(len(data["results"]))
+    elif isinstance(data.get("loc_results"), dict):
+        print(len(data["loc_results"]))
+    else:
+        print(len(data))
+else:
+    print(0)
+PY
+}
+
 run_eval_if_possible() {
   local label="$1"
   local result_dir="$2"
@@ -236,10 +279,103 @@ run_eval_if_possible() {
     return 0
   fi
   if [[ -s "${pred_file}" ]] && ! is_truthy "${FORCE_RERUN}"; then
+    local expected_rows observed_rows
+    expected_rows="$(sample_rows)"
+    observed_rows="$(prediction_rows "${pred_file}" "${PYTHON_BIN:-python3}")"
+    if [[ "${expected_rows}" -gt 0 && "${observed_rows}" -lt "${expected_rows}" ]]; then
+      echo
+      echo "========== Resume ${label} localization =========="
+      echo "[resume] Existing prediction file is incomplete: ${pred_file}"
+      echo "[resume] predictions=${observed_rows}, expected=${expected_rows}"
+      echo "[resume] Continue localization instead of evaluating partial predictions."
+      return 1
+    fi
     run_step "Evaluate existing ${label} predictions" run_shell "${command}"
     return 0
   fi
   return 1
+}
+
+prediction_empty_rate() {
+  local pred_file="$1"
+  local field="$2"
+  local python_bin="${3:-python3}"
+  if [[ ! -s "${pred_file}" ]]; then
+    echo "1.0"
+    return 0
+  fi
+  "${python_bin}" - "${pred_file}" "${field}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+field = sys.argv[2]
+rows = []
+for line in path.read_text(encoding="utf-8").splitlines():
+    if line.strip():
+        rows.append(json.loads(line))
+if not rows:
+    print("1.0")
+else:
+    empty = sum(1 for row in rows if not row.get(field))
+    print(f"{empty / len(rows):.6f}")
+PY
+}
+
+prune_empty_prediction_rows() {
+  local pred_file="$1"
+  local field="$2"
+  local python_bin="${3:-python3}"
+  if [[ ! -s "${pred_file}" ]]; then
+    return 0
+  fi
+  "${python_bin}" - "${pred_file}" "${field}" <<'PY'
+import json
+import shutil
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+field = sys.argv[2]
+rows = []
+for line in path.read_text(encoding="utf-8").splitlines():
+    if line.strip():
+        rows.append(json.loads(line))
+kept = [row for row in rows if row.get(field)]
+if len(kept) == len(rows):
+    print(f"[health] no empty {field} rows to prune in {path}")
+    raise SystemExit(0)
+backup = path.with_suffix(path.suffix + ".before_prune_empty")
+shutil.copy2(path, backup)
+with path.open("w", encoding="utf-8") as f:
+    for row in kept:
+        f.write(json.dumps(row, ensure_ascii=False) + "\n")
+print(f"[health] pruned {len(rows) - len(kept)} empty {field} rows from {path}")
+print(f"[health] backup: {backup}")
+PY
+}
+
+repair_cosil_if_unhealthy() {
+  local pred_file="$1"
+  local result_dir="$2"
+  if [[ ! -s "${pred_file}" ]] || is_truthy "${FORCE_RERUN}"; then
+    return 0
+  fi
+  local rate
+  rate="$(prediction_empty_rate "${pred_file}" found_files "${COSIL_PY}")"
+  echo "[health] CoSIL found_files empty rate: ${rate} (threshold ${COSIL_MAX_EMPTY_RATE})"
+  if "${COSIL_PY}" - "${rate}" "${COSIL_MAX_EMPTY_RATE}" <<'PY'
+import sys
+rate = float(sys.argv[1])
+threshold = float(sys.argv[2])
+raise SystemExit(0 if rate > threshold else 1)
+PY
+  then
+    echo "[health][warn] CoSIL predictions look incomplete; repairing for resume."
+    prune_empty_prediction_rows "${pred_file}" found_files "${COSIL_PY}"
+    rm -rf "${result_dir}/eval" "${result_dir}/eval_strict"
+  fi
 }
 
 ensure_python "${LOCAGENT_PY}" "LocAgent"
@@ -361,7 +497,7 @@ if is_truthy "${RUN_LOCAGENT}"; then
       MULADAPTER_API_KEY='${MULADAPTER_API_KEY}' \
       MODEL='${MODEL}' \
       LOCAGENT_MODEL='${LOCAGENT_MODEL:-}' \
-      LOCAGENT_BACKEND_MODEL='${LOCAGENT_BACKEND_MODEL:-${MODEL}}' \
+      LOCAGENT_BACKEND_MODEL='${LOCAGENT_BACKEND_MODEL:-${LITELLM_MODEL}}' \
       BENCHMARK='${BENCHMARK}' \
       TEST_NAME='${EXP_NAME}' \
       SAMPLE_SIZE='${CANONICAL_SAMPLE_COUNT}' \
@@ -380,6 +516,7 @@ fi
 
 if is_truthy "${RUN_COSIL}"; then
   COSIL_PRED="${COSIL_RESULT_DIR}/file_level/loc_outputs.jsonl"
+  repair_cosil_if_unhealthy "${COSIL_PRED}" "${COSIL_RESULT_DIR}"
   COSIL_EVAL_CMD="cd '${ROOT_DIR}/CoSIL' && \
       '${COSIL_PY}' newtest/scripts/eval_file_level.py \
         --samples '${CANONICAL_SAMPLES}' \
@@ -405,7 +542,7 @@ if is_truthy "${RUN_COSIL}"; then
       MULADAPTER_BASE_URL='${MULADAPTER_BASE_URL}' \
       MULADAPTER_API_KEY='${MULADAPTER_API_KEY}' \
       MODEL='${MODEL}' \
-      COSIL_BACKEND_MODEL='${COSIL_BACKEND_MODEL:-${MODEL}}' \
+      COSIL_BACKEND_MODEL='${COSIL_BACKEND_MODEL:-${LITELLM_MODEL}}' \
       BENCHMARK='${BENCHMARK}' \
       TEST_NAME='${EXP_NAME}' \
       SAMPLE_SIZE='${CANONICAL_SAMPLE_COUNT}' \
@@ -446,7 +583,7 @@ if is_truthy "${RUN_GRAPHLOCATOR}"; then
       MULADAPTER_BASE_URL='${MULADAPTER_BASE_URL}' \
       MULADAPTER_API_KEY='${MULADAPTER_API_KEY}' \
       MODEL='${MODEL}' \
-      GRAPHLOCATOR_BACKEND_MODEL='${GRAPHLOCATOR_BACKEND_MODEL:-${MODEL}}' \
+      GRAPHLOCATOR_BACKEND_MODEL='${GRAPHLOCATOR_BACKEND_MODEL:-${LITELLM_MODEL}}' \
       BENCHMARK='${BENCHMARK}' \
       TEST_NAME='${EXP_NAME}' \
       SAMPLE_SIZE='${CANONICAL_SAMPLE_COUNT}' \

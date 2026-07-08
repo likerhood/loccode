@@ -24,6 +24,9 @@ SEED="${SEED:-20260614}"
 MODEL="${MODEL:-openai/qwen3-vl-8b}"
 MODEL_TAG="${MODEL//\//_}"
 export GRAPHLOCATOR_BACKEND_MODEL="${GRAPHLOCATOR_BACKEND_MODEL:-${MODEL}}"
+if [[ "${GRAPHLOCATOR_BACKEND_MODEL}" != */* ]]; then
+  export GRAPHLOCATOR_BACKEND_MODEL="openai/${GRAPHLOCATOR_BACKEND_MODEL}"
+fi
 SOURCE_JSONL="${SOURCE_JSONL:-}"
 ALLOW_TEXT_ONLY="${ALLOW_TEXT_ONLY:-}"
 DATASET_LANGUAGE="${DATASET_LANGUAGE:-auto}"
@@ -108,7 +111,7 @@ echo "GraphLocator backend model: ${GRAPHLOCATOR_BACKEND_MODEL}"
 ARGS=(
   --dataset_name "${DATASET_STEM}"
   --dataset_language "${DATASET_LANGUAGE}"
-  --model_name "${MODEL}"
+  --model_name "${GRAPHLOCATOR_BACKEND_MODEL}"
   --results_dir "${RESULT_DIR}"
   --repo_playground "${REPO_PLAYGROUND}"
   --repo_skeleton_path "${REPO_SKELETON}"

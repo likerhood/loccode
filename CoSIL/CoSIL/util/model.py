@@ -33,6 +33,32 @@ def litellm_endpoint_kwargs() -> dict[str, str]:
     return kwargs
 
 
+def _fail_fast_enabled() -> bool:
+    return os.environ.get("LLM_FAIL_FAST", "1").strip().lower() not in {"0", "false", "no", "off"}
+
+
+def _fail_fast_patterns() -> list[str]:
+    raw = os.environ.get(
+        "LLM_FAIL_FAST_PATTERNS",
+        "insufficient_quota|quota exceeded|quota_exceeded|insufficient balance|no credit|credit exhausted|"
+        "balance not enough|out of quota|余额不足|额度不足|额度已用完|欠费|无可用额度",
+    )
+    return [item.strip().lower() for item in raw.split("|") if item.strip()]
+
+
+def assert_valid_llm_text(content: str, context: str) -> None:
+    if not _fail_fast_enabled():
+        return
+    text = (content or "").strip()
+    if not text:
+        raise RuntimeError(f"{context}: empty LLM response; stop to avoid writing empty localization results.")
+    lowered = text.lower()
+    for pattern in _fail_fast_patterns():
+        if pattern in lowered:
+            preview = text[:500].replace("\n", "\\n")
+            raise RuntimeError(f"{context}: LLM response looks like an API quota/balance failure: {preview}")
+
+
 class DecoderBase(ABC):
     def __init__(
         self,
@@ -144,6 +170,8 @@ class LiteLLMChatDecoder(DecoderBase):
         completion_tokens = self._get_usage_value(usage, "completion_tokens")
         prompt_tokens = self._get_usage_value(usage, "prompt_tokens")
         responses = [msg.get("content") or "" for msg in messages]
+        for response in responses:
+            assert_valid_llm_text(response, f"CoSIL LiteLLM request model={config['model']}")
 
         traj = {
             "response": responses[0] if responses else "",

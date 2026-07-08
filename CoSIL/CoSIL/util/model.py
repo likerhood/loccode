@@ -1,4 +1,5 @@
 import os
+import time
 from abc import ABC, abstractmethod
 from typing import Any, List
 
@@ -57,6 +58,34 @@ def assert_valid_llm_text(content: str, context: str) -> None:
         if pattern in lowered:
             preview = text[:500].replace("\n", "\\n")
             raise RuntimeError(f"{context}: LLM response looks like an API quota/balance failure: {preview}")
+
+
+def _empty_response_retries() -> int:
+    raw = os.environ.get("LLM_EMPTY_RESPONSE_RETRIES", "2")
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return 2
+
+
+def _empty_response_retry_sleep() -> float:
+    raw = os.environ.get("LLM_EMPTY_RESPONSE_RETRY_SLEEP", "5")
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        return 5.0
+
+
+def _message_has_tool_call(message: dict) -> bool:
+    return bool(message.get("tool_calls") or message.get("function_call"))
+
+
+def assert_valid_llm_message(message: dict, context: str) -> None:
+    if not _fail_fast_enabled():
+        return
+    if _message_has_tool_call(message):
+        return
+    assert_valid_llm_text(message.get("content") or "", context)
 
 
 class DecoderBase(ABC):
@@ -159,19 +188,47 @@ class LiteLLMChatDecoder(DecoderBase):
         if tool_choice is not None:
             config["tool_choice"] = tool_choice
 
-        ret = completion(**config)
-        choices = ret["choices"] if isinstance(ret, dict) else ret.choices
-        messages = []
-        for choice in choices:
-            choice_message = choice["message"] if isinstance(choice, dict) else choice.message
-            messages.append(self._serialize_message(choice_message))
+        retries = _empty_response_retries()
+        retry_sleep = _empty_response_retry_sleep()
+        last_empty_error: RuntimeError | None = None
+        for attempt in range(retries + 1):
+            ret = completion(**config)
+            choices = ret["choices"] if isinstance(ret, dict) else ret.choices
+            messages = []
+            for choice in choices:
+                choice_message = choice["message"] if isinstance(choice, dict) else choice.message
+                messages.append(self._serialize_message(choice_message))
 
-        usage = ret.get("usage", {}) if isinstance(ret, dict) else getattr(ret, "usage", {})
-        completion_tokens = self._get_usage_value(usage, "completion_tokens")
-        prompt_tokens = self._get_usage_value(usage, "prompt_tokens")
-        responses = [msg.get("content") or "" for msg in messages]
-        for response in responses:
-            assert_valid_llm_text(response, f"CoSIL LiteLLM request model={config['model']}")
+            usage = ret.get("usage", {}) if isinstance(ret, dict) else getattr(ret, "usage", {})
+            completion_tokens = self._get_usage_value(usage, "completion_tokens")
+            prompt_tokens = self._get_usage_value(usage, "prompt_tokens")
+            responses = [msg.get("content") or "" for msg in messages]
+            try:
+                if not messages:
+                    raise RuntimeError(
+                        f"CoSIL LiteLLM request model={config['model']}: empty LLM response; "
+                        "stop to avoid writing empty localization results."
+                    )
+                for msg in messages:
+                    assert_valid_llm_message(msg, f"CoSIL LiteLLM request model={config['model']}")
+                break
+            except RuntimeError as exc:
+                if "empty LLM response" not in str(exc) or attempt >= retries:
+                    raise
+                last_empty_error = exc
+                if self.logger is not None:
+                    self.logger.warning(
+                        "Empty LLM response from %s; retrying %s/%s after %.1fs",
+                        config["model"],
+                        attempt + 1,
+                        retries,
+                        retry_sleep,
+                    )
+                if retry_sleep:
+                    time.sleep(retry_sleep)
+        else:
+            if last_empty_error is not None:
+                raise last_empty_error
 
         traj = {
             "response": responses[0] if responses else "",

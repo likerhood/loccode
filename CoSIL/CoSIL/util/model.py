@@ -166,6 +166,7 @@ class LiteLLMChatDecoder(DecoderBase):
             tools: list | None = None,
             tool_choice: str | dict | None = None,
             return_message: bool = False,
+            allow_empty_response: bool = False,
             **kwargs,
     ) -> List[dict]:
         if self.temperature == 0:
@@ -204,12 +205,14 @@ class LiteLLMChatDecoder(DecoderBase):
             prompt_tokens = self._get_usage_value(usage, "prompt_tokens")
             responses = [msg.get("content") or "" for msg in messages]
             try:
-                if not messages:
+                if not messages and not allow_empty_response:
                     raise RuntimeError(
                         f"CoSIL LiteLLM request model={config['model']}: empty LLM response; "
                         "stop to avoid writing empty localization results."
                     )
                 for msg in messages:
+                    if allow_empty_response and not str(msg.get("content") or "").strip():
+                        continue
                     assert_valid_llm_message(msg, f"CoSIL LiteLLM request model={config['model']}")
                 break
             except RuntimeError as exc:

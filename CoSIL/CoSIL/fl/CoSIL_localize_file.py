@@ -18,6 +18,40 @@ from CoSIL.util.utils import load_existing_instance_ids, load_jsonl, load_swe_be
 
 MAX_RETRIES = 5
 
+
+def continue_on_empty_llm_response() -> bool:
+    return os.environ.get("COSIL_CONTINUE_ON_EMPTY_LLM", "1").strip().lower() not in {
+        "0",
+        "false",
+        "no",
+        "off",
+    }
+
+
+def is_empty_llm_response_error(exc: BaseException) -> bool:
+    return "empty LLM response" in str(exc)
+
+
+def write_file_localization_result(output_file, instance_id, found_files, file_traj, write_lock=None):
+    if write_lock is not None:
+        write_lock.acquire()
+    try:
+        with open(output_file, "a") as f:
+            f.write(
+                json.dumps(
+                    {
+                        "instance_id": instance_id,
+                        "found_files": found_files,
+                        "file_traj": file_traj,
+                    }
+                )
+                + "\n"
+            )
+    finally:
+        if write_lock is not None:
+            write_lock.release()
+
+
 def localize_instance(
     bug, args, swe_bench_data, start_file_locs, existing_instance_ids, write_lock=None
 ):
@@ -59,9 +93,26 @@ def localize_instance(
             args.model,
             logger,
         )
-        found_files, additional_artifact_loc_file, file_traj = fl.file_localize_with_g(
-            mock=args.mock
-        )
+        try:
+            found_files, additional_artifact_loc_file, file_traj = fl.file_localize_with_g(
+                mock=args.mock
+            )
+        except RuntimeError as exc:
+            if not (continue_on_empty_llm_response() and is_empty_llm_response_error(exc)):
+                raise
+            logger.error(
+                "Empty LLM response after retries for %s; writing an empty localization result and continuing.",
+                instance_id,
+            )
+            found_files = []
+            file_traj = {
+                "response": "",
+                "error": str(exc),
+                "usage": {
+                    "completion_tokens": 0,
+                    "prompt_tokens": 0,
+                },
+            }
     else:
         # assume start_file is provided
         for locs in start_file_locs:
@@ -72,22 +123,7 @@ def localize_instance(
         if len(found_files) == 0:
             return
 
-
-    if write_lock is not None:
-        write_lock.acquire()
-    with open(args.output_file, "a") as f:
-        f.write(
-            json.dumps(
-                {
-                    "instance_id": instance_id,
-                    "found_files": found_files,
-                    "file_traj": file_traj,
-                }
-            )
-            + "\n"
-        )
-    if write_lock is not None:
-        write_lock.release()
+    write_file_localization_result(args.output_file, instance_id, found_files, file_traj, write_lock)
 
 
 def localize(args):

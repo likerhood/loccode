@@ -43,6 +43,20 @@ def _fail_fast_patterns() -> list[str]:
     return [item.strip().lower() for item in raw.split("|") if item.strip()]
 
 
+def _empty_response_retries() -> int:
+    try:
+        return max(0, int(os.environ.get("LLM_EMPTY_RESPONSE_RETRIES", "2")))
+    except ValueError:
+        return 2
+
+
+def _empty_response_retry_sleep() -> float:
+    try:
+        return max(0.0, float(os.environ.get("LLM_EMPTY_RESPONSE_RETRY_SLEEP", "5")))
+    except ValueError:
+        return 5.0
+
+
 def _message_has_tool_call(message: dict) -> bool:
     tool_calls = message.get("tool_calls") or message.get("function_call")
     return bool(tool_calls)
@@ -81,7 +95,9 @@ def get_llm_response(model_name: str, messages, with_tool=False, tools=None,
     endpoint_kwargs = _litellm_endpoint_kwargs()
 
     def _call_model(model_name, messages, temperature, tools):
-        for attempt in range(5):  # Retry up to 5 times
+        request_retries = max(5, _empty_response_retries() + 1)
+        retry_sleep = _empty_response_retry_sleep()
+        for attempt in range(request_retries):
             try:
                 if tools is None:
                     response = litellm.completion(
@@ -92,7 +108,6 @@ def get_llm_response(model_name: str, messages, with_tool=False, tools=None,
                         max_completion_tokens=max_completion_tokens,
                         **endpoint_kwargs,
                     )
-                    return response
                 else:
                     response = litellm.completion(
                         model=request_model_name,
@@ -104,16 +119,26 @@ def get_llm_response(model_name: str, messages, with_tool=False, tools=None,
                         max_completion_tokens=max_completion_tokens,
                         **endpoint_kwargs,
                     )
-                    return response
+                decoded_answer = [choice["message"].to_dict() for choice in response.choices]
+                for answer in decoded_answer:
+                    _assert_valid_llm_message(answer, f"GraphLocator LiteLLM request model={request_model_name}")
+                return response, decoded_answer
+            except RuntimeError as e:
+                if "empty LLM response" not in str(e):
+                    raise
+                if attempt == request_retries - 1:
+                    raise
+                print(
+                    f"Empty response in {model_name} request via {request_model_name}: {e}. "
+                    f"Retrying after {retry_sleep}s..."
+                )
+                time.sleep(retry_sleep)
             except Exception as e:
                 print(f"Error in {model_name} request via {request_model_name}: {e}. Retrying...")
                 time.sleep(5)
-        raise Exception(f"Failed to get a response from {model_name} after 5 attempts.")
+        raise Exception(f"Failed to get a response from {model_name} after {request_retries} attempts.")
 
-    llm_response = _call_model(model_name, messages, temperature, tool_list)
-    decoded_answer = [choice["message"].to_dict() for choice in llm_response.choices]
-    for answer in decoded_answer:
-        _assert_valid_llm_message(answer, f"GraphLocator LiteLLM request model={request_model_name}")
+    llm_response, decoded_answer = _call_model(model_name, messages, temperature, tool_list)
     finish_reason = [choice["finish_reason"] for choice in llm_response.choices]
     usage = llm_response.usage.to_dict() if hasattr(llm_response, "usage") else {}
     return decoded_answer, finish_reason, usage

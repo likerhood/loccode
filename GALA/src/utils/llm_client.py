@@ -28,6 +28,20 @@ def _fail_fast_patterns():
     return [item.strip().lower() for item in raw.split("|") if item.strip()]
 
 
+def _empty_response_retries() -> int:
+    try:
+        return max(0, int(os.environ.get("LLM_EMPTY_RESPONSE_RETRIES", "2")))
+    except ValueError:
+        return 2
+
+
+def _empty_response_retry_sleep() -> float:
+    try:
+        return max(0.0, float(os.environ.get("LLM_EMPTY_RESPONSE_RETRY_SLEEP", "5")))
+    except ValueError:
+        return 5.0
+
+
 def _extract_first_message_content(response_data):
     if not isinstance(response_data, dict):
         return ""
@@ -159,7 +173,9 @@ def send_chat_completion(
         payload["max_tokens"] = int(max_tokens)
 
     last_error = None
-    for attempt in range(max_retries):
+    total_attempts = max(max_retries, _empty_response_retries() + 1)
+    empty_retry_delay = _empty_response_retry_sleep()
+    for attempt in range(total_attempts):
         try:
             response = requests.post(
                 base_url,
@@ -173,9 +189,17 @@ def send_chat_completion(
             _assert_valid_response_data(response_data, f"GALA request model={model_name}")
             _record_usage(response_data)
             return response_data
+        except RuntimeError as exc:
+            last_error = exc
+            if "empty LLM response" not in str(exc):
+                raise
+            is_last_attempt = attempt == total_attempts - 1
+            if is_last_attempt:
+                break
+            time.sleep(empty_retry_delay)
         except (requests.Timeout, requests.ConnectionError, requests.HTTPError) as exc:
             last_error = exc
-            is_last_attempt = attempt == max_retries - 1
+            is_last_attempt = attempt == total_attempts - 1
             if is_last_attempt:
                 break
             time.sleep(retry_delay)

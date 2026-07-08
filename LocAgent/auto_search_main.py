@@ -87,6 +87,20 @@ def llm_fail_fast_patterns() -> list[str]:
     return [item.strip().lower() for item in raw.split("|") if item.strip()]
 
 
+def llm_empty_response_retries() -> int:
+    try:
+        return max(0, int(os.getenv("LLM_EMPTY_RESPONSE_RETRIES", "2")))
+    except ValueError:
+        return 2
+
+
+def llm_empty_response_retry_sleep() -> float:
+    try:
+        return max(0.0, float(os.getenv("LLM_EMPTY_RESPONSE_RETRY_SLEEP", "5")))
+    except ValueError:
+        return 5.0
+
+
 def assert_valid_llm_message(message, context: str) -> None:
     if not llm_fail_fast_enabled():
         return
@@ -301,47 +315,61 @@ def auto_search_process(result_queue,
                 )
             })
 
-        try:
-            # new conversation
-            if tools and ('hosted_vllm' in model_name or 'qwen' in model_name.lower()):
-                messages = convert_fncall_messages_to_non_fncall_messages(messages, tools, add_in_context_learning_example=False)
-                response = litellm.completion(
-                    model=request_model_name,
-                    temperature=temp, top_p=0.8, repetition_penalty=1.05, 
-                    messages=messages,
-                    stop=NON_FNCALL_STOP_WORDS
+        empty_retries = llm_empty_response_retries()
+        retry_sleep = llm_empty_response_retry_sleep()
+        for response_attempt in range(empty_retries + 1):
+            try:
+                # new conversation
+                if tools and ('hosted_vllm' in model_name or 'qwen' in model_name.lower()):
+                    request_messages = convert_fncall_messages_to_non_fncall_messages(
+                        messages,
+                        tools,
+                        add_in_context_learning_example=False,
+                    )
+                    response = litellm.completion(
+                        model=request_model_name,
+                        temperature=temp, top_p=0.8, repetition_penalty=1.05, 
+                        messages=request_messages,
+                        stop=NON_FNCALL_STOP_WORDS
+                    )
+                elif tools:
+                    response = litellm.completion(
+                        model=request_model_name,
+                        tools=tools,
+                        messages=messages,
+                        temperature=temp,
+                        # stop=['</execute_ipython>'], #</finish>',
+                    )
+                else:
+                    response = litellm.completion(
+                        model=request_model_name,
+                        messages=messages,
+                        temperature=temp,
+                        stop=['</execute_ipython>'], #</finish>',
+                    )
+                assert_valid_llm_message(
+                    response.choices[0].message,
+                    f"LocAgent LiteLLM request model={request_model_name}",
                 )
-            elif tools:
-                response = litellm.completion(
-                    model=request_model_name,
-                    tools=tools,
-                    messages=messages,
-                    temperature=temp,
-                    # stop=['</execute_ipython>'], #</finish>',
-                )
-            else:
-                response = litellm.completion(
-                    model=request_model_name,
-                    messages=messages,
-                    temperature=temp,
-                    stop=['</execute_ipython>'], #</finish>',
-                )
-        except litellm.BadRequestError as e:
-            # If there's an error, send the error info back to the parent process
-            result_queue.put({'error': str(e), 'type': 'BadRequestError'})
-            return
-        except RuntimeError as e:
-            result_queue.put({'error': str(e), 'type': 'RuntimeError'})
-            return
-
-        try:
-            assert_valid_llm_message(
-                response.choices[0].message,
-                f"LocAgent LiteLLM request model={request_model_name}",
-            )
-        except RuntimeError as e:
-            result_queue.put({'error': str(e), 'type': 'RuntimeError'})
-            return
+                break
+            except litellm.BadRequestError as e:
+                # If there's an error, send the error info back to the parent process
+                result_queue.put({'error': str(e), 'type': 'BadRequestError'})
+                return
+            except RuntimeError as e:
+                if "empty LLM response" in str(e) and response_attempt < empty_retries:
+                    logging.warning(
+                        "Empty LLM response from %s; retrying %s/%s after %.1fs",
+                        request_model_name,
+                        response_attempt + 1,
+                        empty_retries,
+                        retry_sleep,
+                    )
+                    if retry_sleep:
+                        time.sleep(retry_sleep)
+                    continue
+                result_queue.put({'error': str(e), 'type': 'RuntimeError'})
+                return
         
         if last_message and response.choices[0].message.content == last_message:
             messages.append({

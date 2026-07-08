@@ -717,7 +717,11 @@ False
         # reflection to correct format
         if len(found_files) == 0:
             corrcted_tpl = format_correct_prompt.format(res=raw_output)
-            formated_res = model.codegen([{"role": "user", "content": corrcted_tpl}], num_samples=1)[0]["response"]
+            formated_res = model.codegen(
+                [{"role": "user", "content": corrcted_tpl}],
+                num_samples=1,
+                allow_empty_response=True,
+            )[0]["response"]
             self.logger.info(formated_res)
             model_found_files = self._parse_top5_file(formated_res)
             found_files = self._resolve_top_files(model_found_files, all_files)
@@ -740,12 +744,14 @@ False
                                                                            self.structure).strip(),
                                                                        import_content=import_content,
                                                                        pre_files=found_files)}],
-            num_samples=1)[0]["response"]
+            num_samples=1,
+            allow_empty_response=True,
+        )[0]["response"]
         self.logger.info(reflection_result)
         reflection_files = self._parse_top5_file(reflection_result)
         reflection_files = self._resolve_top_files(reflection_files, all_files)
         if len(reflection_files) == 0:
-            reflection_files = [get_best_match(f, all_files) for f in reflection_files]
+            reflection_files = found_files
 
         return (
             reflection_files,

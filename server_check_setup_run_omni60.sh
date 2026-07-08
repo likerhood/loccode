@@ -276,9 +276,20 @@ OMNI60_SAMPLES="${ROOT_DIR}/LocAgent/newtest/omnigirl-unified60/data/samples.jso
 OMNI60_STRUCTURES="${ROOT_DIR}/LocAgent/newtest/omnigirl-unified60/repo_structures"
 LOCAL_OMNI_SOURCE="$(resolve_local_omni_source)"
 
-require_nonempty "BASE_URL" "${BASE_URL}"
-require_nonempty "API_KEY" "${API_KEY}"
-require_nonempty "MODEL_NAME" "${MODEL_NAME}"
+LLM_BASELINE_SELECTED=0
+if [[ "${BASELINES}" =~ (^|[[:space:]])(locagent|cosil|graphlocator|gala)([[:space:]]|$) ]]; then
+  LLM_BASELINE_SELECTED=1
+fi
+
+if [[ "${LLM_BASELINE_SELECTED}" == "1" ]]; then
+  require_nonempty "BASE_URL" "${BASE_URL}"
+  require_nonempty "API_KEY" "${API_KEY}"
+  require_nonempty "MODEL_NAME" "${MODEL_NAME}"
+else
+  BASE_URL="${BASE_URL:-dummy}"
+  API_KEY="${API_KEY:-dummy}"
+  MODEL_NAME="${MODEL_NAME:-dummy}"
+fi
 
 LITELLM_MODEL_NAME="${LITELLM_MODEL_NAME:-${MODEL_NAME}}"
 if [[ "${LITELLM_MODEL_NAME}" != */* ]]; then

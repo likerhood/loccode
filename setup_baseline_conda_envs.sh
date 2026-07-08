@@ -503,6 +503,19 @@ install_mmir() {
       torch
   fi
   pip_install_requirements_if_present "${MMIR_ENV}" "${ROOT_DIR}/MM-IR/requirements-dense.txt"
+  if [[ "${MMIR_INSTALL_CUDA_TORCH}" == "1" || "${MMIR_INSTALL_CUDA_TORCH}" == "true" || "${MMIR_INSTALL_CUDA_TORCH}" == "yes" ]]; then
+    local args
+    mapfile -t args < <(env_args "${MMIR_ENV}")
+    echo "[mmir] re-checking CUDA torch from ${MMIR_TORCH_INDEX_URL} after dense dependencies"
+    run_cmd "${CONDA_BIN}" run "${args[@]}" python -m pip install \
+      --retries "${PIP_RETRIES}" \
+      --timeout "${PIP_TIMEOUT}" \
+      --progress-bar "${PIP_PROGRESS_BAR}" \
+      --index-url "${MMIR_TORCH_INDEX_URL}" \
+      --upgrade \
+      --force-reinstall \
+      torch
+  fi
   smoke_test "${MMIR_ENV}" "MM-IR dense imports" \
     "import sentence_transformers, transformers, torch, accelerate; print('mmir ok', 'cuda=', torch.cuda.is_available())"
 }

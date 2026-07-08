@@ -111,6 +111,7 @@ PIP_INSTALL_RETRY_SLEEP="${PIP_INSTALL_RETRY_SLEEP:-10}"
 GRAPHLOCATOR_LIGHTWEIGHT="${GRAPHLOCATOR_LIGHTWEIGHT:-1}"
 MMIR_INSTALL_CUDA_TORCH="${MMIR_INSTALL_CUDA_TORCH:-0}"
 MMIR_TORCH_INDEX_URL="${MMIR_TORCH_INDEX_URL:-https://download.pytorch.org/whl/cu121}"
+MMIR_TORCH_SPEC="${MMIR_TORCH_SPEC:-torch==2.5.1}"
 
 DRY_RUN="${DRY_RUN:-0}"
 RECREATE="${RECREATE:-0}"
@@ -494,27 +495,26 @@ install_mmir() {
   if [[ "${MMIR_INSTALL_CUDA_TORCH}" == "1" || "${MMIR_INSTALL_CUDA_TORCH}" == "true" || "${MMIR_INSTALL_CUDA_TORCH}" == "yes" ]]; then
     local args
     mapfile -t args < <(env_args "${MMIR_ENV}")
-    echo "[mmir] installing CUDA-enabled torch from ${MMIR_TORCH_INDEX_URL}"
+    echo "[mmir] installing CUDA-enabled ${MMIR_TORCH_SPEC} from ${MMIR_TORCH_INDEX_URL}"
     run_cmd "${CONDA_BIN}" run "${args[@]}" python -m pip install \
       --retries "${PIP_RETRIES}" \
       --timeout "${PIP_TIMEOUT}" \
       --progress-bar "${PIP_PROGRESS_BAR}" \
       --index-url "${MMIR_TORCH_INDEX_URL}" \
-      torch
+      "${MMIR_TORCH_SPEC}"
   fi
   pip_install_requirements_if_present "${MMIR_ENV}" "${ROOT_DIR}/MM-IR/requirements-dense.txt"
   if [[ "${MMIR_INSTALL_CUDA_TORCH}" == "1" || "${MMIR_INSTALL_CUDA_TORCH}" == "true" || "${MMIR_INSTALL_CUDA_TORCH}" == "yes" ]]; then
     local args
     mapfile -t args < <(env_args "${MMIR_ENV}")
-    echo "[mmir] re-checking CUDA torch from ${MMIR_TORCH_INDEX_URL} after dense dependencies"
+    echo "[mmir] re-checking CUDA ${MMIR_TORCH_SPEC} from ${MMIR_TORCH_INDEX_URL} after dense dependencies"
     run_cmd "${CONDA_BIN}" run "${args[@]}" python -m pip install \
       --retries "${PIP_RETRIES}" \
       --timeout "${PIP_TIMEOUT}" \
       --progress-bar "${PIP_PROGRESS_BAR}" \
       --index-url "${MMIR_TORCH_INDEX_URL}" \
       --upgrade \
-      --force-reinstall \
-      torch
+      "${MMIR_TORCH_SPEC}"
   fi
   smoke_test "${MMIR_ENV}" "MM-IR dense imports" \
     "import sentence_transformers, transformers, torch, accelerate; print('mmir ok', 'cuda=', torch.cuda.is_available())"

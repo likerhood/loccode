@@ -37,7 +37,21 @@ def load_jsonl(path: Path) -> list[dict[str, Any]]:
 
 def load_records(dataset: str, split: str, source_jsonl: str = "") -> list[dict[str, Any]]:
     if source_jsonl:
-        return load_jsonl(Path(source_jsonl))
+        source_path = Path(source_jsonl)
+        if not source_path.exists():
+            raise FileNotFoundError(
+                f"Source JSONL does not exist: {source_path}. "
+                "Set SOURCE_JSONL/--source-jsonl to an existing OmniGIRL JSONL, "
+                "or prepare MM-IR/data/omnigirl-full-candidates/source_omnigirl_full.jsonl."
+            )
+        return load_jsonl(source_path)
+    if not dataset:
+        raise FileNotFoundError(
+            "No dataset id or source JSONL was provided. For OmniGIRL, set "
+            "SOURCE_JSONL=/path/to/samples.jsonl or place one of the known local "
+            "source files under LocAgent/test/OmniGIRL_small60/test60/ or "
+            "MM-IR/data/omnigirl-full-candidates/."
+        )
     from datasets import load_dataset
 
     try:
@@ -230,7 +244,17 @@ def benchmark_defaults(benchmark: str) -> tuple[str, str, str]:
     if benchmark == "swebench_multimodal":
         return "SWE-bench/SWE-bench_Multimodal", "dev", ""
     if benchmark == "omnigirl":
-        return "", "train", "/home/like/locCode/LocAgent/test/OmniGIRL_small60/test60/samples.jsonl"
+        repo_root = Path(__file__).resolve().parents[3]
+        candidates = [
+            os.getenv("OMNIGIRL_SOURCE_JSONL", ""),
+            str(repo_root / "LocAgent/test/OmniGIRL_small60/test60/samples.jsonl"),
+            str(repo_root / "MM-IR/data/omnigirl-full-candidates/source_omnigirl_full.jsonl"),
+            str(repo_root / "MM-IR/data/omnigirl-full-candidates/samples.jsonl"),
+        ]
+        for candidate in candidates:
+            if candidate and Path(candidate).exists():
+                return "", "train", candidate
+        return "Deep-Software-Analytics/OmniGIRL", "train", ""
     raise ValueError(f"Unsupported benchmark: {benchmark}")
 
 

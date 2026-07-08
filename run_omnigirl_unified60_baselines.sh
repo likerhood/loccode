@@ -48,12 +48,40 @@ FORCE_RERUN="${FORCE_RERUN:-0}"
 FORCE_PREPARE="${FORCE_PREPARE:-0}"
 FORCE_STRUCTURES="${FORCE_STRUCTURES:-0}"
 
-SOURCE_JSONL="${SOURCE_JSONL:-}"
+USER_SOURCE_JSONL="${SOURCE_JSONL:-}"
 CANONICAL_ROOT="${ROOT_DIR}/LocAgent/newtest/${EXP_NAME}"
 CANONICAL_DATA_DIR="${CANONICAL_ROOT}/data"
 CANONICAL_SAMPLES="${CANONICAL_DATA_DIR}/samples.jsonl"
 CANONICAL_STRUCTURE_DIR="${CANONICAL_ROOT}/repo_structures"
 COSIL_STRUCTURE_DIR="${COSIL_STRUCTURE_DIR:-${ROOT_DIR}/CoSIL/newtest/${EXP_NAME}/repo_structures}"
+
+resolve_prepare_source_jsonl() {
+  if [[ -n "${USER_SOURCE_JSONL}" ]]; then
+    if [[ ! -s "${USER_SOURCE_JSONL}" ]]; then
+      echo "ERROR: SOURCE_JSONL was set but does not exist or is empty: ${USER_SOURCE_JSONL}" >&2
+      echo "Unset SOURCE_JSONL to allow automatic local/HuggingFace preparation." >&2
+      exit 2
+    fi
+    echo "${USER_SOURCE_JSONL}"
+    return 0
+  fi
+
+  local candidate
+  local candidates=(
+    "${OMNIGIRL_SOURCE_JSONL:-}"
+    "${ROOT_DIR}/LocAgent/test/OmniGIRL_small60/test60/samples.jsonl"
+    "${ROOT_DIR}/MM-IR/data/omnigirl-full-candidates/source_omnigirl_full.jsonl"
+    "${ROOT_DIR}/MM-IR/data/omnigirl-full-candidates/samples.jsonl"
+  )
+  for candidate in "${candidates[@]}"; do
+    if [[ -n "${candidate}" && -s "${candidate}" ]]; then
+      echo "${candidate}"
+      return 0
+    fi
+  done
+
+  echo ""
+}
 
 ensure_python() {
   local py="$1"
@@ -177,6 +205,16 @@ echo "Unified OmniGIRL experiment: ${EXP_NAME}"
 echo "Canonical samples: ${CANONICAL_SAMPLES}"
 echo "Canonical structures: ${CANONICAL_STRUCTURE_DIR}"
 
+PREPARE_SOURCE_JSONL="$(resolve_prepare_source_jsonl)"
+if [[ -n "${PREPARE_SOURCE_JSONL}" ]]; then
+  echo "Prepare source: local JSONL ${PREPARE_SOURCE_JSONL}"
+else
+  echo "Prepare source: HuggingFace dataset fallback (Deep-Software-Analytics/OmniGIRL)"
+  if [[ -n "${HF_ENDPOINT:-}" ]]; then
+    echo "HF endpoint: ${HF_ENDPOINT}"
+  fi
+fi
+
 PREPARE_ARGS=(
   newtest/scripts/prepare_multimodal_localization.py
   --benchmark "${BENCHMARK}"
@@ -186,8 +224,8 @@ PREPARE_ARGS=(
   --used-list-name "${USED_LIST}"
   --allow-text-only
 )
-if [[ -n "${SOURCE_JSONL}" ]]; then
-  PREPARE_ARGS+=(--source-jsonl "${SOURCE_JSONL}")
+if [[ -n "${PREPARE_SOURCE_JSONL}" ]]; then
+  PREPARE_ARGS+=(--source-jsonl "${PREPARE_SOURCE_JSONL}")
 fi
 
 if ! is_truthy "${FORCE_PREPARE}" && [[ -s "${CANONICAL_SAMPLES}" ]] && [[ "$(sample_rows)" == "${SAMPLE_SIZE}" ]]; then

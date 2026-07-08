@@ -70,6 +70,7 @@ resolve_prepare_source_jsonl() {
   local candidates=(
     "${OMNIGIRL_SOURCE_JSONL:-}"
     "${ROOT_DIR}/LocAgent/test/OmniGIRL_small60/test60/samples.jsonl"
+    "${ROOT_DIR}/OmniGIRL/omnigirl/harness/benchmark/OmniGIRL.json"
     "${ROOT_DIR}/MM-IR/data/omnigirl-full-candidates/source_omnigirl_full.jsonl"
     "${ROOT_DIR}/MM-IR/data/omnigirl-full-candidates/samples.jsonl"
   )

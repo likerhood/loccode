@@ -35,6 +35,19 @@ def load_jsonl(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
+def load_json_or_jsonl(path: Path) -> list[dict[str, Any]]:
+    if path.suffix == ".jsonl":
+        return load_jsonl(path)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if isinstance(payload, list):
+        return [dict(item) for item in payload]
+    if isinstance(payload, dict):
+        if "instances" in payload and isinstance(payload["instances"], list):
+            return [dict(item) for item in payload["instances"]]
+        return [dict(item) for item in payload.values() if isinstance(item, dict)]
+    raise TypeError(f"Unsupported source payload in {path}: {type(payload).__name__}")
+
+
 def load_records(dataset: str, split: str, source_jsonl: str = "") -> list[dict[str, Any]]:
     if source_jsonl:
         source_path = Path(source_jsonl)
@@ -44,7 +57,7 @@ def load_records(dataset: str, split: str, source_jsonl: str = "") -> list[dict[
                 "Set SOURCE_JSONL/--source-jsonl to an existing OmniGIRL JSONL, "
                 "or prepare MM-IR/data/omnigirl-full-candidates/source_omnigirl_full.jsonl."
             )
-        return load_jsonl(source_path)
+        return load_json_or_jsonl(source_path)
     if not dataset:
         raise FileNotFoundError(
             "No dataset id or source JSONL was provided. For OmniGIRL, set "
@@ -248,13 +261,14 @@ def benchmark_defaults(benchmark: str) -> tuple[str, str, str]:
         candidates = [
             os.getenv("OMNIGIRL_SOURCE_JSONL", ""),
             str(repo_root / "LocAgent/test/OmniGIRL_small60/test60/samples.jsonl"),
+            str(repo_root / "OmniGIRL/omnigirl/harness/benchmark/OmniGIRL.json"),
             str(repo_root / "MM-IR/data/omnigirl-full-candidates/source_omnigirl_full.jsonl"),
             str(repo_root / "MM-IR/data/omnigirl-full-candidates/samples.jsonl"),
         ]
         for candidate in candidates:
             if candidate and Path(candidate).exists():
-                return "", "train", candidate
-        return "Deep-Software-Analytics/OmniGIRL", "train", ""
+                return "", "test", candidate
+        return "Deep-Software-Analytics/OmniGIRL", "test", ""
     raise ValueError(f"Unsupported benchmark: {benchmark}")
 
 

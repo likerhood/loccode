@@ -109,9 +109,17 @@ PIP_PROGRESS_BAR="${PIP_PROGRESS_BAR:-off}"
 PIP_INSTALL_ATTEMPTS="${PIP_INSTALL_ATTEMPTS:-3}"
 PIP_INSTALL_RETRY_SLEEP="${PIP_INSTALL_RETRY_SLEEP:-10}"
 GRAPHLOCATOR_LIGHTWEIGHT="${GRAPHLOCATOR_LIGHTWEIGHT:-1}"
-MMIR_INSTALL_CUDA_TORCH="${MMIR_INSTALL_CUDA_TORCH:-0}"
+MMIR_INSTALL_CUDA_TORCH="${MMIR_INSTALL_CUDA_TORCH:-auto}"
 MMIR_TORCH_INDEX_URL="${MMIR_TORCH_INDEX_URL:-https://download.pytorch.org/whl/cu121}"
 MMIR_TORCH_SPEC="${MMIR_TORCH_SPEC:-torch==2.5.1}"
+export PYTHONNOUSERSITE="${PYTHONNOUSERSITE:-1}"
+
+if [[ -n "${TMPDIR:-}" ]]; then
+  mkdir -p "${TMPDIR}"
+fi
+if [[ -n "${PIP_CACHE_DIR:-}" ]]; then
+  mkdir -p "${PIP_CACHE_DIR}"
+fi
 
 DRY_RUN="${DRY_RUN:-0}"
 RECREATE="${RECREATE:-0}"
@@ -489,22 +497,54 @@ install_gala() {
     "import openai, requests, PIL, numpy, pandas, tqdm; print('gala ok')"
 }
 
+mmir_should_install_cuda_torch() {
+  local mode
+  mode="$(echo "${MMIR_INSTALL_CUDA_TORCH}" | tr '[:upper:]' '[:lower:]')"
+  case "${mode}" in
+    1|true|yes|on)
+      return 0
+      ;;
+    0|false|no|off)
+      return 1
+      ;;
+    auto)
+      if command -v nvidia-smi >/dev/null 2>&1; then
+        return 0
+      fi
+      if [[ "${DENSE_DEVICE:-}" == cuda* ]]; then
+        return 0
+      fi
+      return 1
+      ;;
+    *)
+      echo "[warn] Unknown MMIR_INSTALL_CUDA_TORCH=${MMIR_INSTALL_CUDA_TORCH}; treating as disabled." >&2
+      return 1
+      ;;
+  esac
+}
+
+install_mmir_cuda_torch() {
+  local args
+  mapfile -t args < <(env_args "${MMIR_ENV}")
+  echo "[mmir] installing CUDA-enabled ${MMIR_TORCH_SPEC} from ${MMIR_TORCH_INDEX_URL}"
+  run_cmd "${CONDA_BIN}" run "${args[@]}" python -m pip install \
+    --retries "${PIP_RETRIES}" \
+    --timeout "${PIP_TIMEOUT}" \
+    --progress-bar "${PIP_PROGRESS_BAR}" \
+    --index-url "${MMIR_TORCH_INDEX_URL}" \
+    "${MMIR_TORCH_SPEC}"
+}
+
 install_mmir() {
   create_env "${MMIR_ENV}" "${MMIR_PYTHON_VERSION}"
   pip_install "${MMIR_ENV}" numpy pandas requests tqdm pydantic beautifulsoup4 unidiff
-  if [[ "${MMIR_INSTALL_CUDA_TORCH}" == "1" || "${MMIR_INSTALL_CUDA_TORCH}" == "true" || "${MMIR_INSTALL_CUDA_TORCH}" == "yes" ]]; then
-    local args
-    mapfile -t args < <(env_args "${MMIR_ENV}")
-    echo "[mmir] installing CUDA-enabled ${MMIR_TORCH_SPEC} from ${MMIR_TORCH_INDEX_URL}"
-    run_cmd "${CONDA_BIN}" run "${args[@]}" python -m pip install \
-      --retries "${PIP_RETRIES}" \
-      --timeout "${PIP_TIMEOUT}" \
-      --progress-bar "${PIP_PROGRESS_BAR}" \
-      --index-url "${MMIR_TORCH_INDEX_URL}" \
-      "${MMIR_TORCH_SPEC}"
+  if mmir_should_install_cuda_torch; then
+    install_mmir_cuda_torch
+  else
+    echo "[mmir] MMIR_INSTALL_CUDA_TORCH=${MMIR_INSTALL_CUDA_TORCH}; letting dense dependencies resolve torch."
   fi
   pip_install_requirements_if_present "${MMIR_ENV}" "${ROOT_DIR}/MM-IR/requirements-dense.txt"
-  if [[ "${MMIR_INSTALL_CUDA_TORCH}" == "1" || "${MMIR_INSTALL_CUDA_TORCH}" == "true" || "${MMIR_INSTALL_CUDA_TORCH}" == "yes" ]]; then
+  if mmir_should_install_cuda_torch; then
     local args
     mapfile -t args < <(env_args "${MMIR_ENV}")
     echo "[mmir] re-checking CUDA ${MMIR_TORCH_SPEC} from ${MMIR_TORCH_INDEX_URL} after dense dependencies"

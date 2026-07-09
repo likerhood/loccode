@@ -248,8 +248,8 @@ API_KEY="${API_KEY:-}"
 MODEL_NAME="${MODEL_NAME:-}"
 PARALLEL="${PARALLEL:-1}"
 MAX_PARALLEL_BASELINES="${MAX_PARALLEL_BASELINES:-2}"
-BASELINE_ENVS="${BASELINE_ENVS:-locagent cosil graphlocator gala}"
 BASELINES="${BASELINES:-locagent cosil graphlocator gala}"
+BASELINE_ENVS="${BASELINE_ENVS:-${BASELINES}}"
 RUN_MMIR_METHODS="${RUN_MMIR_METHODS:-bm25-mmir e5-mmir jina-code-v2-mmir codesage-large-v2-mmir coderankembed-mmir}"
 ALLOW_HF_PREPARE="${ALLOW_HF_PREPARE:-auto}"
 HF_DATASET_ID="${HF_DATASET_ID:-Deep-Software-Analytics/OmniGIRL}"
@@ -297,11 +297,11 @@ if [[ "${LITELLM_MODEL_NAME}" != */* ]]; then
 fi
 
 RUN_MODEL_NAME="${MODEL_NAME}"
-if ! grep -q "COSIL_BACKEND_MODEL" "${ROOT_DIR}/CoSIL/CoSIL/util/model.py" 2>/dev/null; then
+if baseline_enabled cosil && ! grep -q "COSIL_BACKEND_MODEL" "${ROOT_DIR}/CoSIL/CoSIL/util/model.py" 2>/dev/null; then
   echo "[compat warn] CoSIL does not support COSIL_BACKEND_MODEL yet; using MODEL=${LITELLM_MODEL_NAME} for this run." >&2
   RUN_MODEL_NAME="${LITELLM_MODEL_NAME}"
 fi
-if ! grep -q "GRAPHLOCATOR_BACKEND_MODEL" "${ROOT_DIR}/GraphLocator/llms/__init__.py" 2>/dev/null; then
+if baseline_enabled graphlocator && ! grep -q "GRAPHLOCATOR_BACKEND_MODEL" "${ROOT_DIR}/GraphLocator/llms/__init__.py" 2>/dev/null; then
   echo "[compat warn] GraphLocator does not support GRAPHLOCATOR_BACKEND_MODEL yet; using MODEL=${LITELLM_MODEL_NAME} for this run." >&2
   RUN_MODEL_NAME="${LITELLM_MODEL_NAME}"
 fi

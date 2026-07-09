@@ -386,7 +386,11 @@ ensure_inputs() {
   }
 }
 
-ensure_python "${LOCAGENT_PY}" "LocAgent"
+ensure_inputs
+
+if is_truthy "${RUN_LOCAGENT}"; then
+  ensure_python "${LOCAGENT_PY}" "LocAgent"
+fi
 if is_truthy "${RUN_COSIL}"; then
   ensure_python "${COSIL_PY}" "CoSIL"
   ensure_import "${COSIL_PY}" "anthropic" "CoSIL"
@@ -400,7 +404,6 @@ fi
 if is_truthy "${RUN_MMIR}"; then
   ensure_python "${MMIR_PY}" "MM-IR"
 fi
-ensure_inputs
 
 SAMPLE_COUNT="$(sample_rows)"
 if [[ "${SAMPLE_COUNT}" == "0" ]] && is_truthy "${DRY_RUN}"; then

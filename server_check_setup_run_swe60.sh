@@ -99,8 +99,8 @@ HF_DATASET_ID="${HF_DATASET_ID:-SWE-bench/SWE-bench_Multimodal}"
 HF_DATASET_API_URL="${HF_DATASET_API_URL:-https://huggingface.co/api/datasets/${HF_DATASET_ID}}"
 SWE60_INPUT_TAR="${SWE60_INPUT_TAR:-${ROOT_DIR}/swebench_multimodal_60_inputs.tar.gz}"
 LOG_DIR="${LOG_DIR:-${ROOT_DIR}/logs/server_swe60_$(date +%Y%m%d_%H%M%S)}"
-BASELINE_ENVS="${BASELINE_ENVS:-locagent cosil graphlocator gala mmir}"
 BASELINES="${BASELINES:-locagent cosil graphlocator gala mmir}"
+BASELINE_ENVS="${BASELINE_ENVS:-${BASELINES}}"
 RUN_MMIR_METHODS="${RUN_MMIR_METHODS:-bm25-mmir e5-mmir jina-code-v2-mmir codesage-large-v2-mmir coderankembed-mmir}"
 COSIL_MAX_EMPTY_RATE="${COSIL_MAX_EMPTY_RATE:-0.30}"
 LLM_FAIL_FAST="${LLM_FAIL_FAST:-1}"
@@ -360,16 +360,16 @@ EOF
 
 require_runtime_sources_or_explain() {
   local missing=0
-  if [[ ! -f "${ROOT_DIR}/GALA/mytest/scripts/run_gala_swebench_multimodal_60_localization.sh" ]]; then
+  if baseline_enabled gala && [[ ! -f "${ROOT_DIR}/GALA/mytest/scripts/run_gala_swebench_multimodal_60_localization.sh" ]]; then
     echo "ERROR: missing GALA runner: ${ROOT_DIR}/GALA/mytest/scripts/run_gala_swebench_multimodal_60_localization.sh" >&2
     echo "       Pull the latest repository. This file used to be ignored by .gitignore." >&2
     missing=1
   fi
-  if ! grep -q "COSIL_BACKEND_MODEL" "${ROOT_DIR}/CoSIL/CoSIL/util/model.py" 2>/dev/null; then
+  if baseline_enabled cosil && ! grep -q "COSIL_BACKEND_MODEL" "${ROOT_DIR}/CoSIL/CoSIL/util/model.py" 2>/dev/null; then
     echo "[compat warn] CoSIL source does not contain COSIL_BACKEND_MODEL support." >&2
     echo "[compat warn] This runner will pass MODEL=${LITELLM_MODEL_NAME}, but you should pull the latest code." >&2
   fi
-  if ! grep -q "GRAPHLOCATOR_BACKEND_MODEL" "${ROOT_DIR}/GraphLocator/llms/__init__.py" 2>/dev/null; then
+  if baseline_enabled graphlocator && ! grep -q "GRAPHLOCATOR_BACKEND_MODEL" "${ROOT_DIR}/GraphLocator/llms/__init__.py" 2>/dev/null; then
     echo "[compat warn] GraphLocator source does not contain GRAPHLOCATOR_BACKEND_MODEL support." >&2
     echo "[compat warn] This runner will pass MODEL=${LITELLM_MODEL_NAME}, but you should pull the latest code." >&2
   fi
@@ -403,11 +403,11 @@ fi
 # provider-prefixed model for MODEL as a compatibility fallback instead of
 # failing with "LLM Provider NOT provided".
 RUN_MODEL_NAME="${MODEL_NAME}"
-if ! grep -q "COSIL_BACKEND_MODEL" "${ROOT_DIR}/CoSIL/CoSIL/util/model.py" 2>/dev/null; then
+if baseline_enabled cosil && ! grep -q "COSIL_BACKEND_MODEL" "${ROOT_DIR}/CoSIL/CoSIL/util/model.py" 2>/dev/null; then
   echo "[compat warn] CoSIL does not support COSIL_BACKEND_MODEL yet; using MODEL=${LITELLM_MODEL_NAME} for this run." >&2
   RUN_MODEL_NAME="${LITELLM_MODEL_NAME}"
 fi
-if ! grep -q "GRAPHLOCATOR_BACKEND_MODEL" "${ROOT_DIR}/GraphLocator/llms/__init__.py" 2>/dev/null; then
+if baseline_enabled graphlocator && ! grep -q "GRAPHLOCATOR_BACKEND_MODEL" "${ROOT_DIR}/GraphLocator/llms/__init__.py" 2>/dev/null; then
   echo "[compat warn] GraphLocator does not support GRAPHLOCATOR_BACKEND_MODEL yet; using MODEL=${LITELLM_MODEL_NAME} for this run." >&2
   RUN_MODEL_NAME="${LITELLM_MODEL_NAME}"
 fi

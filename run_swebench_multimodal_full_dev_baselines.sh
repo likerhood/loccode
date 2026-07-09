@@ -234,6 +234,25 @@ structure_rows() {
   fi
 }
 
+needs_locagent_python_for_shared_inputs() {
+  if is_truthy "${RUN_LOCAGENT}"; then
+    return 0
+  fi
+  if is_truthy "${FORCE_PREPARE}" || ! expected_sample_rows_ready; then
+    return 0
+  fi
+  if is_truthy "${FORCE_STRUCTURES}"; then
+    return 0
+  fi
+  local samples structures
+  samples="$(sample_rows)"
+  structures="$(structure_rows)"
+  if [[ "${samples}" == "0" || "${structures}" -lt "${samples}" ]]; then
+    return 0
+  fi
+  return 1
+}
+
 metric_pair() {
   local dir="$1"
   echo "${dir}/eval/metrics_3level.md|${dir}/eval_strict/metrics_3level.md"
@@ -394,7 +413,9 @@ PY
   fi
 }
 
-ensure_python "${LOCAGENT_PY}" "LocAgent"
+if needs_locagent_python_for_shared_inputs; then
+  ensure_python "${LOCAGENT_PY}" "LocAgent"
+fi
 if is_truthy "${RUN_COSIL}"; then
   ensure_python "${COSIL_PY}" "CoSIL"
   ensure_import "${COSIL_PY}" "anthropic" "CoSIL"

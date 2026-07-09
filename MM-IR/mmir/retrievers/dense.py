@@ -89,12 +89,47 @@ def _resolve_torch_device(requested: str | None, torch_module: Any) -> str:
     return device
 
 
+def _install_transformers_compat_shims(torch_module: Any | None = None) -> None:
+    """Restore tiny APIs removed from newer transformers for older remote models."""
+    try:
+        import transformers.pytorch_utils as pytorch_utils
+    except ImportError:
+        return
+
+    if hasattr(pytorch_utils, "find_pruneable_heads_and_indices"):
+        return
+
+    if torch_module is None:
+        try:
+            import torch as torch_module  # type: ignore[no-redef]
+        except ImportError:
+            return
+
+    def find_pruneable_heads_and_indices(
+        heads: list[int] | set[int],
+        n_heads: int,
+        head_size: int,
+        already_pruned_heads: set[int],
+    ) -> tuple[set[int], Any]:
+        heads = set(heads) - already_pruned_heads
+        mask = torch_module.ones(n_heads, head_size)
+        for head in heads:
+            head = head - sum(1 if pruned_head < head else 0 for pruned_head in already_pruned_heads)
+            mask[head] = 0
+        mask = mask.view(-1).contiguous().eq(1)
+        index = torch_module.arange(len(mask))[mask].long()
+        return heads, index
+
+    pytorch_utils.find_pruneable_heads_and_indices = find_pruneable_heads_and_indices
+
+
 class SentenceTransformersBackend:
     _model_cache: dict[tuple[str, bool, str | None], Any] = {}
 
     def __init__(self, config: DenseModelConfig, *, device: str | None = None):
         try:
             import torch
+            _install_transformers_compat_shims(torch)
             from sentence_transformers import SentenceTransformer
         except ImportError as exc:
             raise RuntimeError(
@@ -132,6 +167,7 @@ class TransformersBackend:
     def __init__(self, config: DenseModelConfig, *, device: str | None = None):
         try:
             import torch
+            _install_transformers_compat_shims(torch)
             from transformers import AutoModel, AutoTokenizer
         except ImportError as exc:
             raise RuntimeError(

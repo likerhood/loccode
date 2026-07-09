@@ -93,34 +93,44 @@ def _install_transformers_compat_shims(torch_module: Any | None = None) -> None:
     """Restore tiny APIs removed from newer transformers for older remote models."""
     try:
         import transformers.pytorch_utils as pytorch_utils
+        from transformers.configuration_utils import PretrainedConfig
     except ImportError:
         return
 
-    if hasattr(pytorch_utils, "find_pruneable_heads_and_indices"):
-        return
+    # Some older trust_remote_code models still read these attributes directly
+    # from their config object. Newer transformers no longer guarantees every
+    # custom config has the old BERT defaults, so provide class-level fallbacks.
+    for attr, value in {
+        "is_decoder": False,
+        "add_cross_attention": False,
+        "chunk_size_feed_forward": 0,
+    }.items():
+        if not hasattr(PretrainedConfig, attr):
+            setattr(PretrainedConfig, attr, value)
 
-    if torch_module is None:
-        try:
-            import torch as torch_module  # type: ignore[no-redef]
-        except ImportError:
-            return
+    if not hasattr(pytorch_utils, "find_pruneable_heads_and_indices"):
+        if torch_module is None:
+            try:
+                import torch as torch_module  # type: ignore[no-redef]
+            except ImportError:
+                return
 
-    def find_pruneable_heads_and_indices(
-        heads: list[int] | set[int],
-        n_heads: int,
-        head_size: int,
-        already_pruned_heads: set[int],
-    ) -> tuple[set[int], Any]:
-        heads = set(heads) - already_pruned_heads
-        mask = torch_module.ones(n_heads, head_size)
-        for head in heads:
-            head = head - sum(1 if pruned_head < head else 0 for pruned_head in already_pruned_heads)
-            mask[head] = 0
-        mask = mask.view(-1).contiguous().eq(1)
-        index = torch_module.arange(len(mask))[mask].long()
-        return heads, index
+        def find_pruneable_heads_and_indices(
+            heads: list[int] | set[int],
+            n_heads: int,
+            head_size: int,
+            already_pruned_heads: set[int],
+        ) -> tuple[set[int], Any]:
+            heads = set(heads) - already_pruned_heads
+            mask = torch_module.ones(n_heads, head_size)
+            for head in heads:
+                head = head - sum(1 if pruned_head < head else 0 for pruned_head in already_pruned_heads)
+                mask[head] = 0
+            mask = mask.view(-1).contiguous().eq(1)
+            index = torch_module.arange(len(mask))[mask].long()
+            return heads, index
 
-    pytorch_utils.find_pruneable_heads_and_indices = find_pruneable_heads_and_indices
+        pytorch_utils.find_pruneable_heads_and_indices = find_pruneable_heads_and_indices
 
 
 class SentenceTransformersBackend:

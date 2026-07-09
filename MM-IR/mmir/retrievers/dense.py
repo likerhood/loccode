@@ -92,11 +92,15 @@ def _resolve_torch_device(requested: str | None, torch_module: Any) -> str:
 def _install_transformers_compat_shims(torch_module: Any | None = None) -> None:
     """Restore tiny APIs removed from newer transformers for older remote models."""
     try:
+        import transformers.modeling_utils as modeling_utils
         import transformers.pytorch_utils as pytorch_utils
         from transformers.configuration_utils import PretrainedConfig
         from transformers.modeling_utils import PreTrainedModel
     except ImportError:
         return
+
+    if not hasattr(modeling_utils, "Conv1D") and hasattr(pytorch_utils, "Conv1D"):
+        modeling_utils.Conv1D = pytorch_utils.Conv1D
 
     # Some older trust_remote_code models still read these attributes directly
     # from their config object. Newer transformers no longer guarantees every

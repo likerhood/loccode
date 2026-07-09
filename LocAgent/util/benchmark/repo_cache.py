@@ -3,6 +3,7 @@ import logging
 import os
 import shutil
 import subprocess
+import time
 import uuid
 from typing import Optional
 
@@ -166,7 +167,33 @@ def _replace_dir_from_temp(tmp_path: str, final_path: str) -> None:
 def _clone_mirror_from_remote(github_repo_path: str, mirror_path: str) -> None:
     tmp_path = f"{mirror_path}.tmp-{uuid.uuid4()}"
     try:
-        _run_command(["git", "clone", "--mirror", github_repo_url(github_repo_path), tmp_path])
+        args = ["git", "clone", "--mirror", github_repo_url(github_repo_path), tmp_path]
+        retries = max(1, int(os.environ.get("LOCAGENT_GIT_CLONE_RETRIES", "3")))
+        retry_sleep = float(os.environ.get("LOCAGENT_GIT_CLONE_RETRY_SLEEP", "10"))
+        last_result: subprocess.CompletedProcess[str] | None = None
+        for attempt in range(1, retries + 1):
+            last_result = subprocess.run(args, check=False, text=True, capture_output=True)
+            if last_result.returncode == 0:
+                break
+            logger.warning(
+                "git mirror clone failed for %s attempt %s/%s: %s",
+                github_repo_path,
+                attempt,
+                retries,
+                (last_result.stderr or last_result.stdout or "").strip()[-1000:],
+            )
+            if attempt < retries:
+                shutil.rmtree(tmp_path, ignore_errors=True)
+                time.sleep(retry_sleep)
+        if last_result is None or last_result.returncode != 0:
+            stderr = (last_result.stderr if last_result else "") or ""
+            stdout = (last_result.stdout if last_result else "") or ""
+            raise RuntimeError(
+                "git mirror clone failed after "
+                f"{retries} attempt(s): {' '.join(args)}\n"
+                f"stdout:\n{stdout.strip()}\n"
+                f"stderr:\n{stderr.strip()}"
+            )
         _replace_dir_from_temp(tmp_path, mirror_path)
     except Exception:
         shutil.rmtree(tmp_path, ignore_errors=True)

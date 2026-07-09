@@ -44,7 +44,11 @@ print("[MM-IR] torch device count:", torch.cuda.device_count())
 PY
 fi
 
-if [[ "${METHOD}" != "bm25-mmir" && "${DENSE_DEVICE}" == cuda* && "${DENSE_DEVICE_AUTO_FALLBACK}" != "0" ]]; then
+fallback_enabled() {
+  [[ "${DENSE_DEVICE_AUTO_FALLBACK}" != "0" && "${DENSE_DEVICE_AUTO_FALLBACK}" != "false" && "${DENSE_DEVICE_AUTO_FALLBACK}" != "no" ]]
+}
+
+if [[ "${METHOD}" != "bm25-mmir" && "${DENSE_DEVICE}" == cuda* ]] && fallback_enabled; then
   if ! "${PYTHON_BIN}" - <<'PY' >/dev/null 2>&1
 import torch
 raise SystemExit(0 if torch.cuda.is_available() else 1)
@@ -56,15 +60,29 @@ PY
   fi
 fi
 
-"${PYTHON_BIN}" -m mmir.cli locate \
-  --samples "${SAMPLE_FILE}" \
-  --structure-dir "${STRUCTURE_DIR}" \
-  --output-dir "${OUTPUT_DIR}" \
-  --method "${METHOD}" \
-  --limit "${LIMIT}" \
-  --dense-model "${DENSE_MODEL}" \
-  --dense-batch-size "${DENSE_BATCH_SIZE}" \
-  --dense-device "${DENSE_DEVICE}"
+run_locate() {
+  local device="$1"
+  "${PYTHON_BIN}" -m mmir.cli locate \
+    --samples "${SAMPLE_FILE}" \
+    --structure-dir "${STRUCTURE_DIR}" \
+    --output-dir "${OUTPUT_DIR}" \
+    --method "${METHOD}" \
+    --limit "${LIMIT}" \
+    --dense-model "${DENSE_MODEL}" \
+    --dense-batch-size "${DENSE_BATCH_SIZE}" \
+    --dense-device "${device}"
+}
+
+if ! run_locate "${DENSE_DEVICE}"; then
+  if [[ "${METHOD}" != "bm25-mmir" && "${DENSE_DEVICE}" == cuda* ]] && fallback_enabled; then
+    echo "[MM-IR][warn] Dense run failed on ${DENSE_DEVICE}; retrying ${METHOD} on CPU." >&2
+    echo "[MM-IR][warn] To fail instead, set DENSE_DEVICE_AUTO_FALLBACK=0." >&2
+    DENSE_DEVICE="cpu"
+    run_locate "${DENSE_DEVICE}"
+  else
+    exit 1
+  fi
+fi
 
 "${PYTHON_BIN}" -m mmir.evaluation.eval_3level \
   --samples "${SAMPLE_FILE}" \

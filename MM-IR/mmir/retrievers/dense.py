@@ -94,6 +94,7 @@ def _install_transformers_compat_shims(torch_module: Any | None = None) -> None:
     try:
         import transformers.pytorch_utils as pytorch_utils
         from transformers.configuration_utils import PretrainedConfig
+        from transformers.modeling_utils import PreTrainedModel
     except ImportError:
         return
 
@@ -131,6 +132,43 @@ def _install_transformers_compat_shims(torch_module: Any | None = None) -> None:
             return heads, index
 
         pytorch_utils.find_pruneable_heads_and_indices = find_pruneable_heads_and_indices
+
+    if not hasattr(PreTrainedModel, "_convert_head_mask_to_5d"):
+
+        def _convert_head_mask_to_5d(self: Any, head_mask: Any, num_hidden_layers: int) -> Any:
+            if head_mask.dim() == 1:
+                head_mask = head_mask.unsqueeze(0).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
+                head_mask = head_mask.expand(num_hidden_layers, -1, -1, -1, -1)
+            elif head_mask.dim() == 2:
+                head_mask = head_mask.unsqueeze(1).unsqueeze(-1).unsqueeze(-1)
+            if head_mask.dim() != 5:
+                raise ValueError(f"head_mask.dim != 5, instead {head_mask.dim()}")
+            dtype = getattr(self, "dtype", None)
+            if dtype is None:
+                try:
+                    dtype = next(self.parameters()).dtype
+                except StopIteration:
+                    dtype = head_mask.dtype
+            return head_mask.to(dtype=dtype)
+
+        PreTrainedModel._convert_head_mask_to_5d = _convert_head_mask_to_5d
+
+    if not hasattr(PreTrainedModel, "get_head_mask"):
+
+        def get_head_mask(
+            self: Any,
+            head_mask: Any,
+            num_hidden_layers: int,
+            is_attention_chunked: bool = False,
+        ) -> Any:
+            if head_mask is not None:
+                converted = self._convert_head_mask_to_5d(head_mask, num_hidden_layers)
+                if is_attention_chunked:
+                    converted = converted.unsqueeze(-1)
+                return converted
+            return [None] * num_hidden_layers
+
+        PreTrainedModel.get_head_mask = get_head_mask
 
 
 class SentenceTransformersBackend:

@@ -1,0 +1,43 @@
+Package: swe60_results_20260709_173904
+Created at: 2026-07-09T17:39:08+08:00
+Host: user-NF5280M5
+Root: /data2/like/loccode
+Mode: compact
+Redacted: 1
+Archive: /data2/like/loccode/result_archives/swe60_results_20260709_173904.tar.gz
+
+Git commit: 9c4f26d7108ed40cd04a041207a038c23ef1f62d
+Git branch: main
+
+Git status:
+?? GraphLocator/.cache/
+
+Packaged files: 26
+
+File list:
+  CoSIL/newtest/swebench_multimodal-60/results/mimo-v2.5/eval/metrics_3level.json
+  CoSIL/newtest/swebench_multimodal-60/results/mimo-v2.5/eval/metrics_3level.md
+  CoSIL/newtest/swebench_multimodal-60/results/mimo-v2.5/eval_strict/metrics_3level.json
+  CoSIL/newtest/swebench_multimodal-60/results/mimo-v2.5/eval_strict/metrics_3level.md
+  CoSIL/newtest/swebench_multimodal-60/results/mimo-v2.5/file_level/loc_outputs.jsonl
+  GALA/mytest/swebench_multimodal-60/results/mimo-v2.5/eval/metrics_3level.json
+  GALA/mytest/swebench_multimodal-60/results/mimo-v2.5/eval/metrics_3level.md
+  GALA/mytest/swebench_multimodal-60/results/mimo-v2.5/eval_strict/metrics_3level.json
+  GALA/mytest/swebench_multimodal-60/results/mimo-v2.5/eval_strict/metrics_3level.md
+  GALA/mytest/swebench_multimodal-60/results/mimo-v2.5/loc_results.json
+  GraphLocator/newtest/swebench_multimodal-60/results/mimo-v2.5/eval/metrics_3level.json
+  GraphLocator/newtest/swebench_multimodal-60/results/mimo-v2.5/eval/metrics_3level.md
+  GraphLocator/newtest/swebench_multimodal-60/results/mimo-v2.5/eval_strict/metrics_3level.json
+  GraphLocator/newtest/swebench_multimodal-60/results/mimo-v2.5/eval_strict/metrics_3level.md
+  GraphLocator/newtest/swebench_multimodal-60/results/mimo-v2.5/loc_results.json
+  LocAgent/newtest/swebench_multimodal-60/results/mimo-v2.5/eval/metrics_3level.json
+  LocAgent/newtest/swebench_multimodal-60/results/mimo-v2.5/eval/metrics_3level.md
+  LocAgent/newtest/swebench_multimodal-60/results/mimo-v2.5/eval_strict/metrics_3level.json
+  LocAgent/newtest/swebench_multimodal-60/results/mimo-v2.5/eval_strict/metrics_3level.md
+  LocAgent/newtest/swebench_multimodal-60/results/mimo-v2.5/location/loc_outputs.jsonl
+  LocAgent/newtest/swebench_multimodal-60/results/mimo-v2.5/location/loc_trajs.jsonl
+  MM-IR/results/swebench_multimodal-60/bm25-mmir/eval/metrics_3level.json
+  MM-IR/results/swebench_multimodal-60/bm25-mmir/eval/metrics_3level.md
+  MM-IR/results/swebench_multimodal-60/bm25-mmir/eval_strict/metrics_3level.json
+  MM-IR/results/swebench_multimodal-60/bm25-mmir/eval_strict/metrics_3level.md
+  MM-IR/results/swebench_multimodal-60/bm25-mmir/loc_results.json

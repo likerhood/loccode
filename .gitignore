@@ -127,6 +127,9 @@ GraphLocator/rdfs/dependency_graph/lib/
 *.7z
 *.rar
 
+# Baseline result bundles are intentionally shareable artifacts.
+!result_archives/*.tar.gz
+
 # Temporary files
 *.tmp
 *.temp

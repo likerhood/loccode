@@ -45,6 +45,10 @@ baseline_results/
 **/baseline_results/
 **/localization_logs/
 
+# Curated result summaries live here; keep ignoring generated baseline result trees.
+!notes/results/
+!notes/results/*.md
+
 # Generated localization artifacts
 *.jsonl
 loc_outputs.jsonl
@@ -131,6 +135,7 @@ GraphLocator/rdfs/dependency_graph/lib/
 !result_archives/*.tar.gz
 
 # Temporary files
+unpacked_results/
 *.tmp
 *.temp
 *.bak

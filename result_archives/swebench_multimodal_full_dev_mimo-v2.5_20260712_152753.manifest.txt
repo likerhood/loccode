@@ -1,0 +1,94 @@
+Package: swebench_multimodal_full_dev_mimo-v2.5_20260712_152753
+Created at: 2026-07-12T15:27:58+08:00
+Host: user-NF5280M5
+Root: /data2/like/loccode
+Mode: compact
+Redacted: 1
+Archive: /data2/like/loccode/result_archives/swebench_multimodal_full_dev_mimo-v2.5_20260712_152753.tar.gz
+
+Git commit: 96d79a49244200b5a0691527340c42b61b29081e
+Git branch: main
+
+Git status:
+
+Packaged files: 78
+
+File list:
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260708_144149/cosil.log
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260708_144149/cosil.status
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260708_144149/graphlocator.log
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260708_144149/locagent.log
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260708_144149/locagent.status
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260708_144810/cosil.log
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260708_144810/cosil.status
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260708_144810/graphlocator.log
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260708_144810/locagent.log
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260708_144810/locagent.status
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260708_151352/cosil.log
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260708_151352/cosil.status
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260708_151352/graphlocator.log
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260708_151352/locagent.log
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260708_151352/locagent.status
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260708_153153/cosil.log
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260708_153153/cosil.status
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260708_153153/graphlocator.log
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260708_153153/locagent.log
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260708_153153/locagent.status
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260708_163505/cosil.log
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260708_163505/cosil.status
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260708_163505/gala.log
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260708_163505/gala.status
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260708_163505/graphlocator.log
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260708_163505/locagent.log
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260708_163505/locagent.status
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260708_163505/mmir.log
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260708_163505/mmir.status
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260710_152813/cosil.log
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260710_152813/cosil.status
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260710_152813/graphlocator.log
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260710_152813/locagent.log
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260710_152813/locagent.status
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260711_151853/cosil.log
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260711_151853/cosil.status
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260711_151853/gala.log
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260711_151853/gala.status
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260711_151853/graphlocator.log
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260711_151853/graphlocator.status
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260711_151853/locagent.log
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260711_151853/locagent.status
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260711_212717/cosil.log
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260711_212717/cosil.status
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260711_212717/gala.log
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260711_212717/gala.status
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260711_212717/graphlocator.log
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260711_212717/graphlocator.status
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260711_212717/locagent.log
+  baseline_run_logs/swebench_multimodal_full_dev_parallel_20260711_212717/locagent.status
+  CoSIL/newtest/swebench_multimodal-full-dev/results/mimo-v2.5/eval/metrics_3level.json
+  CoSIL/newtest/swebench_multimodal-full-dev/results/mimo-v2.5/eval/metrics_3level.md
+  CoSIL/newtest/swebench_multimodal-full-dev/results/mimo-v2.5/eval_strict/metrics_3level.json
+  CoSIL/newtest/swebench_multimodal-full-dev/results/mimo-v2.5/eval_strict/metrics_3level.md
+  CoSIL/newtest/swebench_multimodal-full-dev/results/mimo-v2.5/file_level/loc_outputs.jsonl
+  GALA/mytest/swebench_multimodal-full-dev/results/mimo-v2.5/eval/metrics_3level.json
+  GALA/mytest/swebench_multimodal-full-dev/results/mimo-v2.5/eval/metrics_3level.md
+  GALA/mytest/swebench_multimodal-full-dev/results/mimo-v2.5/eval_strict/metrics_3level.json
+  GALA/mytest/swebench_multimodal-full-dev/results/mimo-v2.5/eval_strict/metrics_3level.md
+  GALA/mytest/swebench_multimodal-full-dev/results/mimo-v2.5/loc_results.json
+  GraphLocator/newtest/swebench_multimodal-full-dev/results/mimo-v2.5/eval/metrics_3level.json
+  GraphLocator/newtest/swebench_multimodal-full-dev/results/mimo-v2.5/eval/metrics_3level.md
+  GraphLocator/newtest/swebench_multimodal-full-dev/results/mimo-v2.5/eval_strict/metrics_3level.json
+  GraphLocator/newtest/swebench_multimodal-full-dev/results/mimo-v2.5/eval_strict/metrics_3level.md
+  GraphLocator/newtest/swebench_multimodal-full-dev/results/mimo-v2.5/loc_results.json
+  LocAgent/newtest/swebench_multimodal-full-dev/results/mimo-v2.5/eval/metrics_3level.json
+  LocAgent/newtest/swebench_multimodal-full-dev/results/mimo-v2.5/eval/metrics_3level.md
+  LocAgent/newtest/swebench_multimodal-full-dev/results/mimo-v2.5/eval_strict/metrics_3level.json
+  LocAgent/newtest/swebench_multimodal-full-dev/results/mimo-v2.5/eval_strict/metrics_3level.md
+  LocAgent/newtest/swebench_multimodal-full-dev/results/mimo-v2.5/location/loc_outputs.jsonl
+  LocAgent/newtest/swebench_multimodal-full-dev/results/mimo-v2.5/location/loc_trajs.jsonl
+  logs/server_swebench_multimodal_full_dev_20260710_152806/run_swebench_multimodal_full_dev.log
+  logs/server_swebench_multimodal_full_dev_20260711_151850/run_swebench_multimodal_full_dev.log
+  logs/server_swebench_multimodal_full_dev_20260711_212715/run_swebench_multimodal_full_dev.log
+  logs/server_swebench_multimodal_full_dev_20260712_121456/run_swebench_multimodal_full_dev.log
+  run_swebench_multimodal_full_dev_baselines_parallel.sh
+  run_swebench_multimodal_full_dev_baselines.sh
+  server_check_setup_run_swebench_multimodal_full_dev.sh

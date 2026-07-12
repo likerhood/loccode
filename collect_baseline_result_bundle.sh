@@ -111,7 +111,10 @@ trap 'rm -f "${LIST_FILE}"' EXIT
 
 add_if_file() {
   local rel="$1"
-  [[ -f "${ROOT_DIR}/${rel}" ]] && printf '%s\n' "$rel" >>"${LIST_FILE}"
+  if [[ -f "${ROOT_DIR}/${rel}" ]]; then
+    printf '%s\n' "$rel" >>"${LIST_FILE}"
+  fi
+  return 0
 }
 
 find_compact_results() {
@@ -279,6 +282,7 @@ write_manifest() {
 collect_file_list
 
 FILE_COUNT="$(wc -l <"${LIST_FILE}")"
+RESULT_FILE_COUNT="$(grep -c '/results/' "${LIST_FILE}" || true)"
 echo "Root: ${ROOT_DIR}"
 echo "Package name: ${PACKAGE_NAME}"
 echo "Output dir: ${OUTPUT_DIR}"
@@ -294,10 +298,15 @@ else
   echo "Model result filters: <none>"
 fi
 echo "Files selected: ${FILE_COUNT}"
+echo "Result files selected: ${RESULT_FILE_COUNT}"
 
 if [[ "${FILE_COUNT}" == "0" ]]; then
   echo "No files matched. Nothing to package." >&2
   exit 1
+fi
+if [[ "${RESULT_FILE_COUNT}" == "0" && "${#MATCH_PATTERNS[@]}" -gt 0 ]]; then
+  echo "[warn] No */results/* files matched. The bundle would contain only logs/scripts/docs." >&2
+  echo "[warn] Check --match/--model values against the actual result directory names." >&2
 fi
 
 echo

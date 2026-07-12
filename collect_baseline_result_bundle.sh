@@ -13,6 +13,7 @@ GIT_REMOTE="${GIT_REMOTE:-origin}"
 GIT_BRANCH="${GIT_BRANCH:-}"
 GIT_MESSAGE="${GIT_MESSAGE:-Add baseline result bundle ${PACKAGE_NAME}}"
 declare -a MATCH_PATTERNS=()
+declare -a MODEL_PATTERNS=()
 
 usage() {
   cat <<'EOF'
@@ -27,6 +28,9 @@ Options:
   --output-dir DIR     Archive output directory (default: ./result_archives)
   --include-large      Include full result trees under */results (can be large)
   --match TEXT         Keep only paths containing TEXT. Can be repeated (OR match)
+  --model TEXT         For result paths under */results, keep only paths containing TEXT.
+                       Can be repeated (OR match). Useful for mimo-v2.5 vs qwen.
+  --model-match TEXT   Alias for --model
   --no-redact          Do not redact API keys/tokens from copied text files
   --dry-run            Print what would be packaged, do not create archive
   --git-commit         git add -f and commit the archive + manifest
@@ -38,6 +42,7 @@ Options:
 Examples:
   bash collect_baseline_result_bundle.sh
   bash collect_baseline_result_bundle.sh --name swe60_qwen40 --match swebench_multimodal-60
+  bash collect_baseline_result_bundle.sh --name swe_full_mimo --match swebench_multimodal-full-dev --model mimo-v2.5
   bash collect_baseline_result_bundle.sh --include-large --git-commit --git-push
 EOF
 }
@@ -58,6 +63,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --match)
       MATCH_PATTERNS+=("$2")
+      shift 2
+      ;;
+    --model|--model-match)
+      MODEL_PATTERNS+=("$2")
       shift 2
       ;;
     --no-redact)
@@ -201,6 +210,30 @@ collect_file_list() {
     sort -u "${filtered}" -o "${LIST_FILE}"
     rm -f "${filtered}"
   fi
+
+  if [[ "${#MODEL_PATTERNS[@]}" -gt 0 ]]; then
+    local filtered
+    filtered="$(mktemp)"
+    : >"${filtered}"
+    local rel pat keep
+    while IFS= read -r rel; do
+      keep=1
+      if [[ "${rel}" == */results/* ]]; then
+        keep=0
+        for pat in "${MODEL_PATTERNS[@]}"; do
+          if [[ "${rel}" == *"${pat}"* ]]; then
+            keep=1
+            break
+          fi
+        done
+      fi
+      if [[ "${keep}" == "1" ]]; then
+        printf '%s\n' "${rel}" >>"${filtered}"
+      fi
+    done <"${LIST_FILE}"
+    sort -u "${filtered}" -o "${LIST_FILE}"
+    rm -f "${filtered}"
+  fi
 }
 
 redact_text_files() {
@@ -250,6 +283,16 @@ echo "Root: ${ROOT_DIR}"
 echo "Package name: ${PACKAGE_NAME}"
 echo "Output dir: ${OUTPUT_DIR}"
 echo "Mode: $([[ "${INCLUDE_LARGE}" == "1" ]] && echo include-large || echo compact)"
+if [[ "${#MATCH_PATTERNS[@]}" -gt 0 ]]; then
+  echo "Path match filters: ${MATCH_PATTERNS[*]}"
+else
+  echo "Path match filters: <none>"
+fi
+if [[ "${#MODEL_PATTERNS[@]}" -gt 0 ]]; then
+  echo "Model result filters: ${MODEL_PATTERNS[*]}"
+else
+  echo "Model result filters: <none>"
+fi
 echo "Files selected: ${FILE_COUNT}"
 
 if [[ "${FILE_COUNT}" == "0" ]]; then

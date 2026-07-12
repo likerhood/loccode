@@ -8,9 +8,11 @@ set -euo pipefail
 # run_omnigirl_full_baselines*.sh.
 #
 # Important: this is the current runnable full-candidates benchmark口径
-# (normally 631 samples), not the raw OmniGIRL 959 source. The runner expects
-# prepared samples.jsonl and repo_structures to exist, or explicit
-# SOURCE_JSONL/STRUCTURE_DIR overrides.
+# (normally 631 samples), not the raw OmniGIRL 959 source. The runner first
+# checks prepared samples.jsonl/repo_structures. If they are missing, it can
+# prepare the fixed runnable candidate set and build repo_structures by cloning
+# the referenced repositories, matching the behavior of the SWE60/Omni60 server
+# wrappers.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -113,6 +115,29 @@ count_structures() {
   else
     echo 0
   fi
+}
+
+resolve_local_omni_full_source() {
+  local candidate
+  local -a candidates=(
+    "${OMNIGIRL_SOURCE_JSONL:-}"
+    "${ROOT_DIR}/MM-IR/data/omnigirl-full-candidates/source_omnigirl_full.jsonl"
+    "${ROOT_DIR}/OmniGIRL/omnigirl/harness/benchmark/OmniGIRL.json"
+  )
+  for candidate in "${candidates[@]}"; do
+    if [[ -n "${candidate}" && -s "${candidate}" ]]; then
+      echo "${candidate}"
+      return 0
+    fi
+  done
+  echo ""
+}
+
+hf_dataset_available() {
+  if ! command -v curl >/dev/null 2>&1; then
+    return 1
+  fi
+  curl -fsSL --connect-timeout 10 --max-time 30 "${HF_DATASET_API_URL}" >/dev/null 2>&1
 }
 
 graphlocator_env_unhealthy() {
@@ -277,16 +302,163 @@ Expected runnable full-candidates inputs:
   ${SOURCE_JSONL}
   ${STRUCTURE_DIR}/*.json
 
-This server wrapper does not silently rebuild the raw OmniGIRL 959 source into
-the runnable full-candidates set, because that would change the experiment口径.
+Automatic preparation is disabled for this run (ALLOW_PREPARE=0), or automatic
+preparation failed before complete inputs were produced.
 
 Fix one of these:
   1. Copy prepared MM-IR/data/omnigirl-full-candidates from a machine where it exists.
   2. Copy prepared LocAgent/newtest/omnigirl-full-candidates/data and repo_structures.
-  3. Provide explicit paths:
+  3. Re-enable automatic preparation with ALLOW_PREPARE=1.
+  4. Provide explicit paths:
        SOURCE_JSONL=/path/to/samples.jsonl STRUCTURE_DIR=/path/to/repo_structures bash ${0##*/}
 EOF
   exit 2
+}
+
+omnigirl_full_inputs_ready() {
+  local sample_count structure_count expected
+  sample_count="$(count_jsonl_rows "${SOURCE_JSONL}")"
+  structure_count="$(count_structures "${STRUCTURE_DIR}")"
+  expected="${EXPECTED_SAMPLES}"
+  if [[ "${expected}" == "auto" || "${expected}" == "0" ]]; then
+    expected="${sample_count}"
+  fi
+  [[ "${sample_count}" -gt 0 && "${structure_count}" -ge "${sample_count}" ]] && return 0
+  [[ "${sample_count}" -gt 0 && "${expected}" -gt 0 && "${structure_count}" -ge "${expected}" ]] && return 0
+  return 1
+}
+
+prepare_python() {
+  local py
+  py="$(env_python locagent)"
+  if [[ -x "${py}" ]]; then
+    echo "${py}"
+    return 0
+  fi
+  if command -v python3 >/dev/null 2>&1; then
+    command -v python3
+    return 0
+  fi
+  echo ""
+}
+
+prepare_omnigirl_full_inputs() {
+  local sample_count structure_count expected prepare_source data_dir prep_py
+  sample_count="$(count_jsonl_rows "${SOURCE_JSONL}")"
+  structure_count="$(count_structures "${STRUCTURE_DIR}")"
+  expected="${EXPECTED_SAMPLES}"
+  if [[ "${expected}" == "auto" || "${expected}" == "0" ]]; then
+    expected=631
+  fi
+
+  if ! is_truthy "${FORCE_PREPARE}" && ! is_truthy "${FORCE_STRUCTURES}" && omnigirl_full_inputs_ready; then
+    echo "[data] OmniGIRL full-candidates inputs ready: samples=${sample_count}, repo_structures=${structure_count}"
+    return 0
+  fi
+
+  if ! is_truthy "${ALLOW_PREPARE}"; then
+    require_omnigirl_full_inputs_or_explain
+  fi
+
+  prep_py="$(prepare_python)"
+  if [[ -z "${prep_py}" || ! -x "${prep_py}" ]]; then
+    echo "ERROR: no usable python for OmniGIRL preparation." >&2
+    echo "Expected LocAgent env python at $(env_python locagent), or python3 on PATH." >&2
+    exit 2
+  fi
+
+  data_dir="$(dirname "${SOURCE_JSONL}")"
+  mkdir -p "${data_dir}" "${STRUCTURE_DIR}"
+
+  prepare_source="$(resolve_local_omni_full_source)"
+  if [[ -z "${prepare_source}" ]]; then
+    if is_truthy "${ALLOW_HF_PREPARE}"; then
+      echo "[data] No local OmniGIRL raw source; ALLOW_HF_PREPARE=1, preparing from HuggingFace."
+    elif [[ "${ALLOW_HF_PREPARE}" == "auto" ]]; then
+      echo "[data] No local OmniGIRL raw source; checking HuggingFace dataset endpoint: ${HF_DATASET_API_URL}"
+      if hf_dataset_available; then
+        echo "[data] HuggingFace dataset endpoint is reachable; preparing from HuggingFace."
+      else
+        cat >&2 <<EOF
+ERROR: OmniGIRL full-candidates inputs are missing and no local raw OmniGIRL source is available.
+
+Missing prepared inputs:
+  ${SOURCE_JSONL}
+  ${STRUCTURE_DIR}/*.json
+
+No local source found in:
+  OMNIGIRL_SOURCE_JSONL
+  ${ROOT_DIR}/MM-IR/data/omnigirl-full-candidates/source_omnigirl_full.jsonl
+  ${ROOT_DIR}/OmniGIRL/omnigirl/harness/benchmark/OmniGIRL.json
+
+HuggingFace endpoint is not reachable from this shell:
+  ${HF_DATASET_API_URL}
+
+Fix one of these:
+  1. Copy prepared MM-IR/data/omnigirl-full-candidates from another machine.
+  2. Copy raw OmniGIRL JSON to one of the local source paths above.
+  3. Set HF_ENDPOINT=https://hf-mirror.com ALLOW_HF_PREPARE=1 and rerun.
+EOF
+        exit 2
+      fi
+    else
+      echo "ERROR: local OmniGIRL source missing and ALLOW_HF_PREPARE=0." >&2
+      exit 2
+    fi
+  else
+    echo "[data] OmniGIRL raw source: ${prepare_source}"
+  fi
+
+  if is_truthy "${FORCE_PREPARE}" || [[ "$(count_jsonl_rows "${SOURCE_JSONL}")" -lt "${expected}" ]]; then
+    local -a prepare_args=(
+      "${ROOT_DIR}/LocAgent/newtest/scripts/prepare_multimodal_localization.py"
+      --benchmark omnigirl
+      --sample-size "${expected}"
+      --seed "${SEED}"
+      --output-dir "${data_dir}"
+      --used-list-name "${USED_LIST}"
+      --allow-text-only
+    )
+    if [[ -n "${prepare_source}" ]]; then
+      prepare_args+=(--source-jsonl "${prepare_source}")
+    fi
+    run_logged "prepare_omnigirl_full_samples" \
+      env HF_ENDPOINT="${HF_ENDPOINT}" OMNIGIRL_SOURCE_JSONL="${prepare_source}" \
+        OPENAI_API_BASE="${BASE_URL}" OPENAI_API_KEY="${API_KEY}" \
+        "${prep_py}" "${prepare_args[@]}"
+  else
+    echo "[data] Skip sample prepare: ${SOURCE_JSONL} has $(count_jsonl_rows "${SOURCE_JSONL}") rows."
+  fi
+
+  local target_structure_count
+  target_structure_count="$(count_jsonl_rows "${SOURCE_JSONL}")"
+  if [[ "${target_structure_count}" -le 0 ]]; then
+    target_structure_count="${expected}"
+  fi
+  if is_truthy "${FORCE_STRUCTURES}" || [[ "$(count_structures "${STRUCTURE_DIR}")" -lt "${target_structure_count}" ]]; then
+    run_logged "build_omnigirl_full_repo_structures" \
+      env LOCAGENT_GIT_CLONE_RETRIES="${LOCAGENT_GIT_CLONE_RETRIES:-5}" \
+          LOCAGENT_GIT_CLONE_RETRY_SLEEP="${LOCAGENT_GIT_CLONE_RETRY_SLEEP:-20}" \
+        "${prep_py}" "${ROOT_DIR}/LocAgent/newtest/scripts/build_repo_structures.py" \
+          --samples "${SOURCE_JSONL}" \
+          --output-dir "${STRUCTURE_DIR}" \
+          --repo-base-dir "${REPO_BASE_DIR:-repo_newtest_${EXP_NAME}}" \
+          --dataset "newtest_${EXP_NAME}" \
+          --split train \
+          --skip-existing \
+          --continue-on-error
+  else
+    echo "[data] Skip repo_structures build: ${STRUCTURE_DIR} has $(count_structures "${STRUCTURE_DIR}") files."
+  fi
+
+  if is_truthy "${DRY_RUN}"; then
+    return 0
+  fi
+
+  resolve_omnigirl_full_inputs
+  if ! omnigirl_full_inputs_ready; then
+    require_omnigirl_full_inputs_or_explain
+  fi
 }
 
 require_runtime_sources_or_explain() {
@@ -362,6 +534,13 @@ BASELINES="${BASELINES:-locagent cosil graphlocator gala mmir}"
 BASELINE_ENVS="${BASELINE_ENVS:-${BASELINES}}"
 RUN_MMIR_METHODS="${RUN_MMIR_METHODS:-bm25-mmir e5-mmir jina-code-v2-mmir codesage-large-v2-mmir coderankembed-mmir}"
 HF_ENDPOINT="${HF_ENDPOINT:-}"
+ALLOW_PREPARE="${ALLOW_PREPARE:-1}"
+ALLOW_HF_PREPARE="${ALLOW_HF_PREPARE:-auto}"
+HF_DATASET_ID="${HF_DATASET_ID:-Deep-Software-Analytics/OmniGIRL}"
+HF_DATASET_API_URL="${HF_DATASET_API_URL:-https://huggingface.co/api/datasets/${HF_DATASET_ID}}"
+OMNIGIRL_SOURCE_JSONL="${OMNIGIRL_SOURCE_JSONL:-}"
+FORCE_PREPARE="${FORCE_PREPARE:-0}"
+FORCE_STRUCTURES="${FORCE_STRUCTURES:-0}"
 DENSE_DEVICE="${DENSE_DEVICE:-cuda}"
 DENSE_BATCH_SIZE="${DENSE_BATCH_SIZE:-16}"
 DENSE_DEVICE_AUTO_FALLBACK="${DENSE_DEVICE_AUTO_FALLBACK:-1}"
@@ -385,6 +564,11 @@ FAIL_FAST_ON_BASELINE_FAILURE="${FAIL_FAST_ON_BASELINE_FAILURE:-1}"
 LOG_DIR="${LOG_DIR:-${ROOT_DIR}/logs/server_omnigirl_full_$(date +%Y%m%d_%H%M%S)}"
 
 resolve_omnigirl_full_inputs
+
+if is_truthy "${ALLOW_PREPARE}" && ! omnigirl_full_inputs_ready && [[ ! " ${BASELINE_ENVS} " =~ [[:space:]]locagent[[:space:]] ]]; then
+  echo "[data] Prepared OmniGIRL full inputs are incomplete; adding locagent env for data preparation."
+  BASELINE_ENVS="locagent ${BASELINE_ENVS}"
+fi
 
 LLM_BASELINE_SELECTED=0
 if [[ "${BASELINES}" =~ (^|[[:space:]])(locagent|cosil|graphlocator|gala)([[:space:]]|$) ]]; then
@@ -440,6 +624,12 @@ Baseline envs: ${BASELINE_ENVS}
 Baselines to run: ${BASELINES}
 MM-IR methods: ${RUN_MMIR_METHODS}
 HF endpoint: ${HF_ENDPOINT:-<default>}
+Allow prepare: ${ALLOW_PREPARE}
+Allow HF prepare: ${ALLOW_HF_PREPARE}
+HF dataset endpoint: ${HF_DATASET_API_URL}
+Local Omni source: $(resolve_local_omni_full_source || true)
+Force prepare: ${FORCE_PREPARE}
+Force structures: ${FORCE_STRUCTURES}
 CoSIL max empty rate: ${COSIL_MAX_EMPTY_RATE}
 LLM fail fast: ${LLM_FAIL_FAST}
 API preflight: ${API_PREFLIGHT}
@@ -462,7 +652,6 @@ if [[ ! -f "${CONDA_SH}" ]]; then
   exit 2
 fi
 
-require_omnigirl_full_inputs_or_explain
 require_runtime_sources_or_explain
 
 if is_truthy "${API_PREFLIGHT}" && [[ "${BASELINES}" =~ (^|[[:space:]])(locagent|cosil|graphlocator|gala)([[:space:]]|$) ]]; then
@@ -496,6 +685,12 @@ echo "========== Verify baseline Python interpreters =========="
 for env_name in ${BASELINE_ENVS}; do
   check_python_or_die "${env_name}"
 done
+
+echo
+echo "========== Prepare/verify OmniGIRL full-candidates inputs =========="
+prepare_omnigirl_full_inputs
+echo "[data] Final source samples: ${SOURCE_JSONL} ($(count_jsonl_rows "${SOURCE_JSONL}") rows)"
+echo "[data] Final structure dir: ${STRUCTURE_DIR} ($(count_structures "${STRUCTURE_DIR}") files)"
 
 RUN_SCRIPT="${ROOT_DIR}/run_omnigirl_full_baselines.sh"
 if is_truthy "${PARALLEL}"; then

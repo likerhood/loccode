@@ -136,6 +136,8 @@ GraphLocator/rdfs/dependency_graph/lib/
 
 # Temporary files
 unpacked_results/
+clean_subsets/
+collected_results/
 *.tmp
 *.temp
 *.bak

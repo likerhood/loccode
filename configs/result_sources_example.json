@@ -1,0 +1,44 @@
+{
+  "name": "qwen8b_mimo_compare_example",
+  "sample_sources": {
+    "swebench_multimodal-full-dev": {
+      "samples": "LocAgent/newtest/swebench_multimodal-full-dev/data/samples.jsonl",
+      "structure_dir": "LocAgent/newtest/swebench_multimodal-full-dev/repo_structures"
+    },
+    "swebench_multimodal-60": {
+      "samples": "LocAgent/newtest/swebench_multimodal-60/data/samples.jsonl",
+      "structure_dir": "LocAgent/newtest/swebench_multimodal-60/repo_structures"
+    },
+    "omnigirl-unified60": {
+      "samples": "LocAgent/newtest/omnigirl-unified60/data/samples.jsonl",
+      "structure_dir": "LocAgent/newtest/omnigirl-unified60/repo_structures"
+    },
+    "omnigirl-full-candidates": {
+      "samples": "MM-IR/data/omnigirl-full-candidates/samples.jsonl",
+      "structure_dir": "MM-IR/data/omnigirl-full-candidates/repo_structures"
+    }
+  },
+  "items": [
+    {
+      "label": "local_swe_full_qwen8b_locagent",
+      "baseline": "locagent",
+      "benchmark": "swebench_multimodal-full-dev",
+      "model": "qwen3-vl-8b",
+      "result_dir": "LocAgent/newtest/swebench_multimodal-full-dev/results/openai_qwen3-vl-8b"
+    },
+    {
+      "label": "local_swe_full_qwen8b_graphlocator",
+      "baseline": "graphlocator",
+      "benchmark": "swebench_multimodal-full-dev",
+      "model": "qwen3-vl-8b",
+      "result_dir": "GraphLocator/newtest/swebench_multimodal-full-dev/results/openai_qwen3-vl-8b"
+    },
+    {
+      "label": "unpacked_swe60_mimo_graphlocator",
+      "baseline": "graphlocator",
+      "benchmark": "swebench_multimodal-60",
+      "model": "mimo-v2.5",
+      "result_dir": "unpacked_results/swe60_results_mimov2.5/swe60_results_20260709_173904/repo/GraphLocator/newtest/swebench_multimodal-60/results/mimo-v2.5"
+    }
+  ]
+}

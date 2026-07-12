@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="635" viewBox="0 0 1320 635">
+<style>
+  .title { font: 700 22px Arial, "Noto Sans CJK SC", sans-serif; fill: #111827; }
+  .label { font: 13px Arial, "Noto Sans CJK SC", sans-serif; fill: #374151; }
+  .value { font: 12px Arial, "Noto Sans CJK SC", sans-serif; fill: #111827; }
+  .axis { stroke: #9ca3af; stroke-width: 1; }
+  .grid { stroke: #e5e7eb; stroke-width: 1; }
+</style>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="660.0" y="36" text-anchor="middle" class="title">各 benchmark 图片、网页 URL、Gold 文件均值对比</text>
+<line x1="330.0" y1="80" x2="330.0" y2="580" class="grid"/>
+<text x="330.0" y="605" text-anchor="middle" class="label">0.0</text>
+<line x1="560.0" y1="80" x2="560.0" y2="580" class="grid"/>
+<text x="560.0" y="605" text-anchor="middle" class="label">1.1</text>
+<line x1="790.0" y1="80" x2="790.0" y2="580" class="grid"/>
+<text x="790.0" y="605" text-anchor="middle" class="label">2.2</text>
+<line x1="1020.0" y1="80" x2="1020.0" y2="580" class="grid"/>
+<text x="1020.0" y="605" text-anchor="middle" class="label">3.4</text>
+<line x1="1250.0" y1="80" x2="1250.0" y2="580" class="grid"/>
+<text x="1250.0" y="605" text-anchor="middle" class="label">4.5</text>
+<text x="312.0" y="110.0" text-anchor="end" class="label">SWE-bench Multimodal</text>
+<text x="312.0" y="126.0" text-anchor="end" class="label">dev 全量</text>
+<rect x="330" y="80.0" width="605.8" height="18" rx="3" fill="#2563eb"/>
+<text x="943.8" y="94.0" class="value">2.95</text>
+<rect x="330" y="104.0" width="414.8" height="18" rx="3" fill="#16a34a"/>
+<text x="752.8" y="118.0" class="value">2.02</text>
+<rect x="330" y="128.0" width="794.7" height="18" rx="3" fill="#f97316"/>
+<text x="1132.7" y="142.0" class="value">3.87</text>
+<text x="312.0" y="202.0" text-anchor="end" class="label">SWE-bench Multimodal</text>
+<text x="312.0" y="218.0" text-anchor="end" class="label">60 子集</text>
+<rect x="330" y="172.0" width="694.1" height="18" rx="3" fill="#2563eb"/>
+<text x="1032.1" y="186.0" class="value">3.38</text>
+<rect x="330" y="196.0" width="394.3" height="18" rx="3" fill="#16a34a"/>
+<text x="732.3" y="210.0" class="value">1.92</text>
+<rect x="330" y="220.0" width="920.0" height="18" rx="3" fill="#f97316"/>
+<text x="1258.0" y="234.0" class="value">4.48</text>
+<text x="312.0" y="294.0" text-anchor="end" class="label">OmniGIRL full-cand</text>
+<text x="312.0" y="310.0" text-anchor="end" class="label">idates</text>
+<rect x="330" y="264.0" width="26.7" height="18" rx="3" fill="#2563eb"/>
+<text x="364.7" y="278.0" class="value">0.13</text>
+<rect x="330" y="288.0" width="451.8" height="18" rx="3" fill="#16a34a"/>
+<text x="789.8" y="302.0" class="value">2.20</text>
+<rect x="330" y="312.0" width="421.0" height="18" rx="3" fill="#f97316"/>
+<text x="759.0" y="326.0" class="value">2.05</text>
+<text x="312.0" y="386.0" text-anchor="end" class="label">OmniGIRL unified60</text>
+<text x="312.0" y="402.0" text-anchor="end" class="label">子集</text>
+<rect x="330" y="356.0" width="117.1" height="18" rx="3" fill="#2563eb"/>
+<text x="455.1" y="370.0" class="value">0.57</text>
+<rect x="330" y="380.0" width="133.5" height="18" rx="3" fill="#16a34a"/>
+<text x="471.5" y="394.0" class="value">0.65</text>
+<rect x="330" y="404.0" width="232.1" height="18" rx="3" fill="#f97316"/>
+<text x="570.1" y="418.0" class="value">1.13</text>
+<text x="312.0" y="478.0" text-anchor="end" class="label">OmniGIRL 原始源数据</text>
+<rect x="330" y="448.0" width="8.2" height="18" rx="3" fill="#2563eb"/>
+<text x="346.2" y="462.0" class="value">0.04</text>
+<rect x="330" y="472.0" width="410.7" height="18" rx="3" fill="#16a34a"/>
+<text x="748.7" y="486.0" class="value">2.00</text>
+<rect x="330" y="496.0" width="453.8" height="18" rx="3" fill="#f97316"/>
+<text x="791.8" y="510.0" class="value">2.21</text>
+<rect x="330" y="603" width="14" height="14" fill="#2563eb"/>
+<text x="350" y="615" class="label">图片均值</text>
+<rect x="520" y="603" width="14" height="14" fill="#16a34a"/>
+<text x="540" y="615" class="label">网页URL均值</text>
+<rect x="710" y="603" width="14" height="14" fill="#f97316"/>
+<text x="730" y="615" class="label">Gold文件均值</text>
+</svg>

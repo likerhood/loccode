@@ -87,6 +87,47 @@ EOF
   fi
 }
 
+api_host_from_url() {
+  local url="${1:-}"
+  url="${url#*://}"
+  url="${url%%/*}"
+  url="${url%%@}"
+  url="${url%%:*}"
+  echo "${url}"
+}
+
+append_csv_unique() {
+  local current="$1"
+  local item part found
+  shift || true
+  for item in "$@"; do
+    [[ -z "${item}" ]] && continue
+    found=0
+    IFS=',' read -r -a _parts <<< "${current}"
+    for part in "${_parts[@]}"; do
+      if [[ "${part}" == "${item}" ]]; then
+        found=1
+        break
+      fi
+    done
+    if [[ "${found}" == "0" ]]; then
+      current="${current:+${current},}${item}"
+    fi
+  done
+  echo "${current}"
+}
+
+build_api_no_proxy() {
+  local base hosts host
+  base="${NO_PROXY:-${no_proxy:-}}"
+  hosts="${API_NO_PROXY_HOSTS:-$(api_host_from_url "${BASE_URL:-}")}"
+  hosts="${hosts//,/ }"
+  for host in ${hosts}; do
+    base="$(append_csv_unique "${base}" "${host}")"
+  done
+  echo "${base}"
+}
+
 count_jsonl_rows() {
   local path="$1"
   if [[ -f "${path}" ]]; then
@@ -264,6 +305,8 @@ NO_SMOKE_TEST="${NO_SMOKE_TEST:-0}"
 DRY_RUN="${DRY_RUN:-0}"
 API_PREFLIGHT="${API_PREFLIGHT:-1}"
 API_PREFLIGHT_TIMEOUT="${API_PREFLIGHT_TIMEOUT:-30}"
+API_NO_PROXY="${API_NO_PROXY:-1}"
+API_NO_PROXY_HOSTS="${API_NO_PROXY_HOSTS:-}"
 SERVER_HEARTBEAT_INTERVAL="${SERVER_HEARTBEAT_INTERVAL:-30}"
 SERVER_HEARTBEAT_TAIL_LINES="${SERVER_HEARTBEAT_TAIL_LINES:-25}"
 LIVE_LOGS="${LIVE_LOGS:-1}"
@@ -294,6 +337,11 @@ fi
 LITELLM_MODEL_NAME="${LITELLM_MODEL_NAME:-${MODEL_NAME}}"
 if [[ "${LITELLM_MODEL_NAME}" != */* ]]; then
   LITELLM_MODEL_NAME="openai/${LITELLM_MODEL_NAME}"
+fi
+
+API_NO_PROXY_VALUE="${NO_PROXY:-${no_proxy:-}}"
+if [[ "${LLM_BASELINE_SELECTED}" == "1" ]] && is_truthy "${API_NO_PROXY}"; then
+  API_NO_PROXY_VALUE="$(build_api_no_proxy)"
 fi
 
 RUN_MODEL_NAME="${MODEL_NAME}"
@@ -331,6 +379,7 @@ Canonical structures: ${OMNI60_STRUCTURES} ($(count_structures "${OMNI60_STRUCTU
 Skip setup: ${SKIP_SETUP}
 Force recreate envs: ${FORCE_RECREATE_ENVS}
 Dry run: ${DRY_RUN}
+API no-proxy for LLM: ${API_NO_PROXY_VALUE:-<none>} (enabled=${API_NO_PROXY})
 Log dir: ${LOG_DIR}
 EOF
 
@@ -375,6 +424,7 @@ if is_truthy "${API_PREFLIGHT}" && [[ "${BASELINES}" =~ (^|[[:space:]])(locagent
   echo "========== API preflight =========="
   echo "+ ${PYTHON:-python3} ${ROOT_DIR}/scripts/check_openai_compatible_api.py --base-url ${BASE_URL} --api-key <hidden> --model ${LITELLM_MODEL_NAME#openai/} --timeout ${API_PREFLIGHT_TIMEOUT}"
   if ! is_truthy "${DRY_RUN}"; then
+    NO_PROXY="${API_NO_PROXY_VALUE}" no_proxy="${API_NO_PROXY_VALUE}" \
     "${PYTHON:-python3}" "${ROOT_DIR}/scripts/check_openai_compatible_api.py" \
       --base-url "${BASE_URL}" \
       --api-key "${API_KEY}" \
@@ -409,6 +459,8 @@ fi
 
 run_logged "run_omnigirl_60" \
   env \
+    NO_PROXY="${API_NO_PROXY_VALUE}" \
+    no_proxy="${API_NO_PROXY_VALUE}" \
     CONDA_ENV_ROOT="${CONDA_ENV_ROOT}" \
     SOURCE_JSONL="${SOURCE_JSONL:-}" \
     OMNIGIRL_SOURCE_JSONL="${OMNIGIRL_SOURCE_JSONL:-}" \

@@ -101,6 +101,52 @@ def llm_empty_response_retry_sleep() -> float:
         return 5.0
 
 
+def llm_connection_error_retries() -> int:
+    try:
+        return max(0, int(os.getenv("LLM_CONNECTION_ERROR_RETRIES", "8")))
+    except ValueError:
+        return 8
+
+
+def llm_connection_error_retry_sleep() -> float:
+    try:
+        return max(0.0, float(os.getenv("LLM_CONNECTION_ERROR_RETRY_SLEEP", "10")))
+    except ValueError:
+        return 10.0
+
+
+def is_transient_llm_connection_error(exc: BaseException) -> bool:
+    text = f"{type(exc).__name__}: {exc}".lower()
+    transient_markers = (
+        "apiconnectionerror",
+        "apierror",
+        "connection error",
+        "connection reset",
+        "connection aborted",
+        "connection refused",
+        "remote protocol error",
+        "server disconnected",
+        "timeout",
+        "timed out",
+        "temporarily unavailable",
+        "tls",
+        "ssl",
+    )
+    fatal_markers = (
+        "badrequest",
+        "contextwindow",
+        "insufficient_quota",
+        "quota exceeded",
+        "insufficient balance",
+        "no credit",
+        "余额不足",
+        "额度不足",
+    )
+    return any(marker in text for marker in transient_markers) and not any(
+        marker in text for marker in fatal_markers
+    )
+
+
 def assert_valid_llm_message(message, context: str) -> None:
     if not llm_fail_fast_enabled():
         return
@@ -316,8 +362,11 @@ def auto_search_process(result_queue,
             })
 
         empty_retries = llm_empty_response_retries()
+        connection_retries = llm_connection_error_retries()
         retry_sleep = llm_empty_response_retry_sleep()
-        for response_attempt in range(empty_retries + 1):
+        connection_retry_sleep = llm_connection_error_retry_sleep()
+        response_retries = max(empty_retries, connection_retries)
+        for response_attempt in range(response_retries + 1):
             try:
                 # new conversation
                 if tools and ('hosted_vllm' in model_name or 'qwen' in model_name.lower()):
@@ -369,6 +418,22 @@ def auto_search_process(result_queue,
                         time.sleep(retry_sleep)
                     continue
                 result_queue.put({'error': str(e), 'type': 'RuntimeError'})
+                return
+            except Exception as e:
+                if is_transient_llm_connection_error(e) and response_attempt < connection_retries:
+                    sleep_for = connection_retry_sleep * min(response_attempt + 1, 6)
+                    logging.warning(
+                        "Transient LLM connection error from %s; retrying %s/%s after %.1fs: %s",
+                        request_model_name,
+                        response_attempt + 1,
+                        connection_retries,
+                        sleep_for,
+                        e,
+                    )
+                    if sleep_for:
+                        time.sleep(sleep_for)
+                    continue
+                result_queue.put({'error': str(e), 'type': type(e).__name__})
                 return
         
         if last_message and response.choices[0].message.content == last_message:
@@ -616,11 +681,11 @@ def run_localize(rank, args, bug_queue, log_queue, output_file_lock, traj_file_l
                             )
                     finally:
                         result_manager.shutdown()
-                    if isinstance(result, dict) and 'error' in result and result['type'] == 'BadRequestError':
+                    if isinstance(result, dict) and 'error' in result and result.get('type') == 'BadRequestError':
                         raise litellm.BadRequestError(result['error'], args.model, args.model.split('/')[0])
                         # print(f"Error occurred in subprocess: {result['error']}")
-                    if isinstance(result, dict) and 'error' in result and result['type'] == 'RuntimeError':
-                        raise RuntimeError(result['error'])
+                    if isinstance(result, dict) and 'error' in result:
+                        raise RuntimeError(f"{result.get('type', 'Error')}: {result['error']}")
                     else:
                         loc_result, messages, traj_data = result
                         

@@ -1,0 +1,38 @@
+Package: omnigirl_unified60_mimo-v2.5_20260716_155146
+Created at: 2026-07-16T15:51:51+08:00
+Host: user-NF5280M5
+Root: /data2/like/loccode
+Mode: compact
+Redacted: 1
+Archive: /data2/like/loccode/result_archives/omnigirl_unified60_mimo-v2.5_20260716_155146.tar.gz
+
+Git commit: 508e2ec49336e9798ba425e96161b9b565f36a64
+Git branch: main
+
+Git status:
+?? repo_newtest_omnigirl-full-candidates/
+
+Packaged files: 21
+
+File list:
+  CoSIL/newtest/omnigirl-unified60/results/mimo-v2.5/eval/metrics_3level.json
+  CoSIL/newtest/omnigirl-unified60/results/mimo-v2.5/eval/metrics_3level.md
+  CoSIL/newtest/omnigirl-unified60/results/mimo-v2.5/eval_strict/metrics_3level.json
+  CoSIL/newtest/omnigirl-unified60/results/mimo-v2.5/eval_strict/metrics_3level.md
+  CoSIL/newtest/omnigirl-unified60/results/mimo-v2.5/file_level/loc_outputs.jsonl
+  GALA/mytest/omnigirl-unified60/results/mimo-v2.5/eval/metrics_3level.json
+  GALA/mytest/omnigirl-unified60/results/mimo-v2.5/eval/metrics_3level.md
+  GALA/mytest/omnigirl-unified60/results/mimo-v2.5/eval_strict/metrics_3level.json
+  GALA/mytest/omnigirl-unified60/results/mimo-v2.5/eval_strict/metrics_3level.md
+  GALA/mytest/omnigirl-unified60/results/mimo-v2.5/loc_results.json
+  GraphLocator/newtest/omnigirl-unified60/results/mimo-v2.5/eval/metrics_3level.json
+  GraphLocator/newtest/omnigirl-unified60/results/mimo-v2.5/eval/metrics_3level.md
+  GraphLocator/newtest/omnigirl-unified60/results/mimo-v2.5/eval_strict/metrics_3level.json
+  GraphLocator/newtest/omnigirl-unified60/results/mimo-v2.5/eval_strict/metrics_3level.md
+  GraphLocator/newtest/omnigirl-unified60/results/mimo-v2.5/loc_results.json
+  LocAgent/newtest/omnigirl-unified60/results/mimo-v2.5/eval/metrics_3level.json
+  LocAgent/newtest/omnigirl-unified60/results/mimo-v2.5/eval/metrics_3level.md
+  LocAgent/newtest/omnigirl-unified60/results/mimo-v2.5/eval_strict/metrics_3level.json
+  LocAgent/newtest/omnigirl-unified60/results/mimo-v2.5/eval_strict/metrics_3level.md
+  LocAgent/newtest/omnigirl-unified60/results/mimo-v2.5/location/loc_outputs.jsonl
+  LocAgent/newtest/omnigirl-unified60/results/mimo-v2.5/location/loc_trajs.jsonl

@@ -76,6 +76,62 @@ def _empty_response_retry_sleep() -> float:
         return 5.0
 
 
+def _connection_error_retries() -> int:
+    raw = os.environ.get("LLM_CONNECTION_ERROR_RETRIES", "8")
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return 8
+
+
+def _connection_error_retry_sleeps() -> list[float]:
+    raw = os.environ.get("LLM_CONNECTION_ERROR_RETRY_SLEEPS", "30,50,60,100")
+    sleeps: list[float] = []
+    for item in raw.split(","):
+        item = item.strip()
+        if not item:
+            continue
+        try:
+            sleeps.append(max(0.0, float(item)))
+        except ValueError:
+            return []
+    return sleeps
+
+
+def _connection_error_retry_sleep() -> float:
+    raw = os.environ.get("LLM_CONNECTION_ERROR_RETRY_SLEEP", "10")
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        return 10.0
+
+
+def _connection_error_sleep_for_attempt(attempt: int) -> float:
+    sleeps = _connection_error_retry_sleeps()
+    if sleeps:
+        return sleeps[min(attempt, len(sleeps) - 1)]
+    return _connection_error_retry_sleep() * min(attempt + 1, 6)
+
+
+def _is_transient_llm_connection_error(exc: BaseException) -> bool:
+    text = f"{type(exc).__name__}: {exc}".lower()
+    markers = (
+        "connection error",
+        "apiconnectionerror",
+        "connecterror",
+        "connection reset",
+        "connection aborted",
+        "remote protocol error",
+        "read timeout",
+        "timeout",
+        "temporarily unavailable",
+        "server disconnected",
+        "tls",
+        "ssl",
+    )
+    return any(marker in text for marker in markers)
+
+
 def _message_has_tool_call(message: dict) -> bool:
     return bool(message.get("tool_calls") or message.get("function_call"))
 
@@ -189,21 +245,40 @@ class LiteLLMChatDecoder(DecoderBase):
         if tool_choice is not None:
             config["tool_choice"] = tool_choice
 
-        retries = _empty_response_retries()
+        empty_retries = _empty_response_retries()
+        connection_retries = _connection_error_retries()
         retry_sleep = _empty_response_retry_sleep()
         last_empty_error: RuntimeError | None = None
-        for attempt in range(retries + 1):
-            ret = completion(**config)
-            choices = ret["choices"] if isinstance(ret, dict) else ret.choices
-            messages = []
-            for choice in choices:
-                choice_message = choice["message"] if isinstance(choice, dict) else choice.message
-                messages.append(self._serialize_message(choice_message))
+        total_retries = max(empty_retries, connection_retries)
+        for attempt in range(total_retries + 1):
+            try:
+                ret = completion(**config)
+                choices = ret["choices"] if isinstance(ret, dict) else ret.choices
+                messages = []
+                for choice in choices:
+                    choice_message = choice["message"] if isinstance(choice, dict) else choice.message
+                    messages.append(self._serialize_message(choice_message))
 
-            usage = ret.get("usage", {}) if isinstance(ret, dict) else getattr(ret, "usage", {})
-            completion_tokens = self._get_usage_value(usage, "completion_tokens")
-            prompt_tokens = self._get_usage_value(usage, "prompt_tokens")
-            responses = [msg.get("content") or "" for msg in messages]
+                usage = ret.get("usage", {}) if isinstance(ret, dict) else getattr(ret, "usage", {})
+                completion_tokens = self._get_usage_value(usage, "completion_tokens")
+                prompt_tokens = self._get_usage_value(usage, "prompt_tokens")
+                responses = [msg.get("content") or "" for msg in messages]
+            except Exception as exc:
+                if not _is_transient_llm_connection_error(exc) or attempt >= connection_retries:
+                    raise
+                sleep_for = _connection_error_sleep_for_attempt(attempt)
+                if self.logger is not None:
+                    self.logger.warning(
+                        "Transient LLM connection error from %s; retrying %s/%s after %.1fs: %s",
+                        config["model"],
+                        attempt + 1,
+                        connection_retries,
+                        sleep_for,
+                        exc,
+                    )
+                if sleep_for:
+                    time.sleep(sleep_for)
+                continue
             try:
                 if not messages and not allow_empty_response:
                     raise RuntimeError(
@@ -216,7 +291,7 @@ class LiteLLMChatDecoder(DecoderBase):
                     assert_valid_llm_message(msg, f"CoSIL LiteLLM request model={config['model']}")
                 break
             except RuntimeError as exc:
-                if "empty LLM response" not in str(exc) or attempt >= retries:
+                if "empty LLM response" not in str(exc) or attempt >= empty_retries:
                     raise
                 last_empty_error = exc
                 if self.logger is not None:
@@ -224,7 +299,7 @@ class LiteLLMChatDecoder(DecoderBase):
                         "Empty LLM response from %s; retrying %s/%s after %.1fs",
                         config["model"],
                         attempt + 1,
-                        retries,
+                        empty_retries,
                         retry_sleep,
                     )
                 if retry_sleep:

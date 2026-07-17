@@ -109,14 +109,12 @@ TOOL: OBSERVATION: ##Searching for term "isCurrentUserEmailVerified"... ### Sear
 
 CoSIL 真实输出片段：
 
-```text
 ```
 client/state/current-user/selectors.js
 client/signup/config/flows.js
 client/signup/steps/design-type-with-store/pressable-store/index.js
 client/components/email-verification/index.js
 client/signup/config/steps.js
-```
 ```
 
 分析：这个样本不是“找 email selector”这么简单。URL 指向 `isCurrentUserEmailVerified`，它是证据入口，但 gold patch 落在 WooCommerce dashboard、store location、address view 和 countries/settings 状态流上。Mimo LocAgent 能命中 `store-location-setup-view.js`，但仍被 email verification dialog、current-user selector、signup flow 牵引，导致 10 个 gold 文件只召回 1 个。这里需要 evidence seed 与 patch target 分离，并沿业务流程做 patch closure。
@@ -161,16 +159,12 @@ CoSIL 真实输出片段：
 
 ```text
 Based on the bug report and repository structure, the issue involves incorrect border rendering on rounded `<View>` elements. The border fails to follow the `borderRadius` curvature, suggesting problems in style parsing, border drawing logic, or rounded shape handling. The following files are the most likely culprits, ordered by importance:
-
-```
 src/elements/View.js
 src/mixins/border.js
 src/styles/stylesheet.js
 src/utils/border.js
 src/utils/shape.js
 ```
-```
-
 分析：图片展示 borderRadius 增大后边框渲染异常。LocAgent 和 CoSIL 都会搜索 `border`/`borderRadius` 并找到 `src/mixins/borders.js`，这是强信号；但它们也容易扩散到 View、renderer、style transform 等邻域。该类样本的问题不是找不到入口，而是需要识别“视觉症状对应的底层绘制 primitive”，函数级定位应落到 `drawBorders`、`drawHorizontalBorder` 等边框绘制函数。
 
 ### 5.3 `chartjs__Chart.js-10301`
@@ -285,7 +279,311 @@ lib/Renderer.js
 
 分析：这是 Markdown 文本渲染类样本，截图和附件说明 URL 中括号解析错误。Mimo LocAgent 能直接定位 `lib/marked.js::findClosingBracket` 和 link/href 规则，属于多模态证据被成功压缩成语法规则的例子。它说明当图片或 URL 能转成明确 token/API/grammar 线索时，LLM-Agent 的定位效果会明显好于 Web UI/PDF 场景。
 
-## 6. 对现有表格的修正结论
+## 6. OmniGIRL 60 Mimo-v2.5 Clean15 解包结果补充分析
+
+这一节基于刚解压的服务器包：`result_archives/omnigirl_unified60_mimo-v2.5_20260716_155146.tar.gz`。解压位置是 `unpacked_results/omnigirl_unified60_mimo-v2.5_20260716_155146/`。
+
+需要先说明一个口径问题：压缩包路径叫 `omnigirl-unified60`，但里面 60 条预测的 `instance_id` 与本地当前 `LocAgent/newtest/omnigirl-unified60/data/samples.jsonl` 只重合 8 条，与本地 Clean15 只重合 6 条。实际这 60 条可以在 `MM-IR/data/omnigirl-full-candidates/source_omnigirl_full.jsonl` 中全部找到。因此下面把它称为“服务器 Omni60 Mimo 样本集”，不把它和本地旧 unified60 Clean15 结果直接混合。
+
+这次分析已经重新按服务器 Omni60 自身生成 Clean15：先用服务器预测里的 60 个 `instance_id` 从 `MM-IR/data/omnigirl-full-candidates/source_omnigirl_full.jsonl` 抽出样本，再用本地 `MM-IR/data/omnigirl-full-candidates/repo_structures` 计算 gold file/module/function 数量，最后只保留三层 gold 都在 `1..15` 的样本。Clean15 后保留 24/60 条，排除 36 条。
+
+排除原因需要单独说明：有 21 条样本本地没有对应 `repo_structures`，无法判断 module/function gold，因此不能纳入严格三层 Clean15；另外还有样本因为 `function_zero`、`module_zero` 或 gold 数量超过 15 被排除。这意味着下面的分析是“可严格三层评估的 clean 子集”，不是原始 60 条全集。
+
+Clean15 相关文件：
+
+- 样本：`clean_subsets/omnigirl-server60-mimo-v2.5.clean15.samples.jsonl`
+- manifest：`clean_subsets/omnigirl-server60-mimo-v2.5.clean15.manifest.json`
+- 复评估目录：各 baseline 结果目录下的 `eval_server60_clean15/` 和 `eval_strict_server60_clean15/`
+
+### 6.1 服务器 Omni60 Clean15 样本画像
+
+| 维度 | 分布 |
+|---|---|
+| 样本数 | 原始 60；Clean15 保留 24 |
+| 语言 | Python: 10；JavaScript: 9；TypeScript: 3；Java: 2 |
+| 仓库 Top | python/mypy: 9；prettier/prettier: 6；tailwindlabs/tailwindcss: 3；assertj/assertj、google/gson、iamkun/dayjs、pyca/cryptography、statsmodels/statsmodels、webpack/webpack 各 1 |
+| 图片数 | 无图片: 22；有图片: 2 |
+| URL 类型 | 文档/API URL: 8；复现/演示 URL: 6；其他网页 URL: 4；GitHub issue/PR/commit URL: 3；图片 URL: 2；GitHub 代码 URL: 1 |
+
+Clean 后的 Omni60 仍然和 SWE Multimodal 差异很大：SWE 是图片密集型，Omni Clean15 主要是跨语言、URL/文本复现密集型。24 条里只有 2 条有图片；URL 类型集中在文档/API、playground/repl、GitHub issue/PR/commit、GitHub blob 代码链接和其他网页链接。
+
+### 6.2 Mimo-v2.5 Clean15 严格指标汇总
+
+| Baseline | File Acc@1 | File Acc@15 | File MRR@15 | File MAP@15 | File REC@All | Module Acc@15 | Module REC@All | Function Acc@15 | Function REC@All | Empty(file/module/function) |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| LocAgent | 41.67 | 58.33 | 66.39 | 59.44 | 65.97 | 41.67 | 65.97 | 29.17 | 41.32 | 0.00/0.00/0.00 |
+| CoSIL | 33.33 | 37.50 | 57.08 | 43.89 | 48.26 | 33.33 | 42.71 | 12.50 | 19.44 | 0.00/4.17/4.17 |
+| GraphLocator | 4.17 | 20.83 | 9.84 | 7.44 | 25.35 | 12.50 | 18.06 | 8.33 | 10.42 | 0.00/8.33/16.67 |
+| GALA | 20.83 | 37.50 | 36.81 | 31.39 | 39.93 | 33.33 | 35.42 | 4.17 | 8.51 | 45.83/50.00/54.17 |
+
+结论：Clean15 后 LocAgent 仍然最好，File Acc@15 为 58.33，File REC@All 为 65.97；CoSIL 和 GALA 的 File Acc@15 都是 37.50，但 GALA 的 empty 仍然很高。GraphLocator 在 Clean15 下仍然明显偏低，File Acc@15 只有 20.83，说明它的问题不是由非 clean 样本单独造成的，而是初始种子和图扩展策略在跨语言 URL/复现样本上不稳定。
+
+### 6.3 按语言分组的 File REC@All
+
+表格为 `平均 File REC@All (zero_file 数)`，zero_file 表示该组中完全没有命中 gold 文件的样本数。
+
+| 主语言 | 样本数 | LocAgent | CoSIL | GraphLocator | GALA |
+|---|---:|---:|---:|---:|---:|
+| Python | 10 | 65.00 (3) | 60.00 (3) | 45.00 (5) | 0.00 (10) |
+| JavaScript | 9 | 59.26 (2) | 45.37 (3) | 6.48 (7) | 73.15 (1) |
+| TypeScript | 3 | 100.00 (0) | 16.67 (2) | 33.33 (2) | 100.00 (0) |
+| Java | 2 | 50.00 (1) | 50.00 (1) | 0.00 (2) | 0.00 (2) |
+
+语言差异很明显：Python/mypy 类样本常有长 traceback、外部项目 URL 或 issue/PR 链接，模型容易停在 `semanal.py`、`build.py` 这类表层错误栈文件；Java/AssertJ/Gson/Netty 样本通常是 API 行为或异常消息修正，需要沿 assertion/API facade 到 internal helper；TypeScript/Babel/Tailwind 样本经常有 playground URL，定位关键在解析复现输入和编译配置，而不是只检索 URL 文本。
+
+### 6.4 按 URL 类型分组的 File REC@All
+
+| URL 类型 | 样本数 | LocAgent | CoSIL | GraphLocator | GALA |
+|---|---:|---:|---:|---:|---:|
+| 文档/API URL | 8 | 79.17 (1) | 72.92 (1) | 54.17 (3) | 4.17 (7) |
+| 复现/演示 URL | 6 | 79.17 (1) | 41.67 (3) | 0.00 (6) | 87.50 (0) |
+| 其他网页 URL | 4 | 37.50 (2) | 50.00 (1) | 37.50 (2) | 50.00 (2) |
+| GitHub issue/PR/commit URL | 3 | 8.33 (2) | 8.33 (2) | 8.33 (2) | 0.00 (3) |
+| 图片 URL | 2 | 100.00 (0) | 0.00 (2) | 0.00 (2) | 100.00 (0) |
+| GitHub 代码 URL | 1 | 100.00 (0) | 100.00 (0) | 0.00 (1) | 0.00 (1) |
+
+这里的“无URL”只表示 issue 文本里没有显式 URL，不表示没有复现代码。Omni 的关键不是图片，而是 URL 的结构化解析：playground/repl URL 里有输入代码和配置；GitHub blob URL 给出 path/line/symbol；issue/PR/commit URL 给出历史补丁线索；文档/API URL 给出行为规范。当前 baseline 基本把这些都压成普通文本，所以会出现两类失败：一类是被 URL 指向的相关文件误导，另一类是没有解析 URL hash 中的复现程序和配置。
+
+### 6.5 图片样本补充
+
+| 图片分组 | 样本数 | LocAgent | CoSIL | GraphLocator | GALA |
+|---|---:|---:|---:|---:|---:|
+| 无图片 | 22 | 62.88 (6) | 52.65 (7) | 27.65 (14) | 34.47 (13) |
+| 有图片 | 2 | 100.00 (0) | 0.00 (2) | 0.00 (2) | 100.00 (0) |
+
+Clean15 后只有 2 条图片样本，主要是错误输出截图或 issue 内联图片，和 SWE 的 UI/PDF/Canvas 视觉定位不同。因此 Omni 这里的“多模态”更准确地说是 URL/网页/复现上下文多模态，而不是图片主导。
+
+### 6.6 典型样本与失败轨迹
+
+#### 样本 `assertj__assertj-1763`：Java / `assertj/assertj`
+
+Issue 真实问题：`hasNoNullFieldsOrProperties()` 在自定义 `Map` 委托类上误报。样例里用户写了一个 `DelegateMap implements Map<String, String>`，内部委托给 `HashMap`，然后调用 `Assertions.assertThat(map).hasNoNullFieldsOrProperties()`。期望是不报错；实际 AssertJ 在字段/属性反射过程中没有正确处理 Map 委托对象。
+
+URL 证据：
+- https://github.com/joel-costigliola/assertj-core/commit/337f99eee5cdcab9270145c47b429cbc48fb0134
+
+Gold 文件：
+- `src/main/java/org/assertj/core/util/introspection/PropertyOrFieldSupport.java`
+
+| Baseline | File REC@All | Top 预测文件 |
+|---|---:|---|
+| LocAgent | 0.00 | `src/main/java/org/assertj/core/internal/CommonErrors.java`, `src/main/java/org/assertj/core/api/AssertionsForInterfaceTypes.java`, `src/main/java/org/assertj/core/internal/Urls.java`, `src/main/java/org/assertj/core/internal/Paths.java`, `src/main/java/org/assertj/core/internal/OnFieldsComparator.java` |
+| CoSIL | 0.00 | `src/main/java/org/assertj/core/api/AbstractObjectAssert.java`, `src/main/java/org/assertj/core/groups/Properties.java`, `src/main/java/org/assertj/core/util/introspection/Introspection.java`, `src/main/java/org/assertj/core/api/AbstractMapAssert.java`, `src/main/java/org/assertj/core/internal/Files.java` |
+| GraphLocator | 0.00 | `src/main/java/org/assertj/core/api/Assertions.java`, `src/test/java/org/assertj/core/error/ShouldHaveSameHashCode_create_Test.java`, `src/test/java/org/assertj/core/error/ClassModifierShouldBe_create_Test.java`, `src/test/java/org/assertj/core/api/classes/ClassAssert_hasAnnotation_Test.java`, `src/test/java/org/assertj/core/api/classes/ClassAssert_hasAnnotations_Test.java` |
+| GALA | 0.00 | 空 |
+
+LocAgent 输出片段：
+
+~~~text
+src/main/java/org/assertj/core/internal/CommonErrors.java
+function: arrayOfValuesToLookForIsEmpty
+line: 29
+function: iterableOfValuesToLookForIsEmpty
+line: 33
+
+src/main/java/org/assertj/core/api/AssertionsForInterfaceTypes.java
+function: AssertDelegateTarget_example
+line: 364
+function: assertThat
+line: 80
+
+src/main/java/org/assertj/core/internal/Urls.java
+function: assertHasPath
+line: 56
+function: assertHasUserInfo
+line: 88
+
+src/main/java/org/assertj/core/internal/OnFieldsComparator.java
+function: getFields
+line: 49
+function: description
+line: 65
+~~~
+
+CoSIL 推理片段：
+
+~~~text
+Based on the bug report and repository structure, here are the most likely culprit files for the issue where hasNoNullFieldsOrProperties() fails for delegate Map implementations:
+
+src/main/java/org/assertj/core/api/AbstractObjectAssert.java
+src/main/java/org/assertj/core/internal/Fields.java
+src/main/java/org/assertj/core/internal/Properties.java
+src/main/java/org/assertj/core/util/Introspection.java
+src/main/java/org/assertj/core/api/AbstractMapAssert.java
+
+Reasoning:
+1. AbstractObjectAssert.java - Most likely contains the hasNoNullFieldsOrProperties() method implementation that's failing.
+2. Fields.java - Handles field introspection which may be incorrectly treating Map methods as fields.
+3. Properties.java - Manages property introspection.
+~~~
+
+分析：失败核心是 API facade 与 internal helper 的跨层跳转。Issue 写 `hasNoNullFieldsOrProperties()` 和 `Map` 委托实现，baseline 普遍把目标放在 `AbstractObjectAssert`、`AbstractMapAssert`、`Introspection` 或大量 internal 类上，但真实 patch 在 `PropertyOrFieldSupport.getSimpleValue`，逻辑是调整 property、field、map key 的尝试顺序。这里需要 Java API 调用链：assertion method -> property/field support -> map fallback，而不是只按类名检索。
+
+#### 样本 `python__mypy-14569`：Python / `python/mypy`
+
+Issue 真实问题：mypy 在 `mypy_primer` 项目 Tanjun 上出现 `Must not defer during final iteration` crash。Issue 给出了 Tanjun 仓库、相关 mypy PR 评论、触发 Tanjun commit，以及长 traceback。表层 traceback 指向 `mypy/build.py`、`mypy/semanal_main.py`、`mypy/semanal.py`，但真实修复点是 `mypy/types.py`。
+
+URL 证据：
+- https://github.com/FasterSpeeding/Tanjun
+- https://github.com/python/mypy/pull/14238#issuecomment-1409828838
+- https://github.com/FasterSpeeding/Tanjun/commit/942b8b47106dddee9129ec4a6be312fe3e5eeac9
+
+Gold 文件：
+- `mypy/types.py`
+
+| Baseline | File REC@All | Top 预测文件 |
+|---|---:|---|
+| LocAgent | 0.00 | `mypy/semanal.py`, `mypy/semanal_main.py` |
+| CoSIL | 0.00 | `mypy/semanal.py`, `mypy/semanal_main.py`, `mypy/build.py`, `mypy/semanal_shared.py`, `mypy/semanal_pass1.py` |
+| GraphLocator | 0.00 | `mypy/semanal.py`, `mypy/semanal_main.py`, `mypy/nodes.py`, `mypy/build.py`, `github/workflows/mypy_primer.yml` |
+| GALA | 0.00 | 空 |
+
+LocAgent 输出片段：
+
+~~~text
+mypy/semanal.py
+line: 862-864
+function: SemanticAnalyzer.analyze_func_def
+
+mypy/semanal.py
+line: 5918
+function: SemanticAnalyzer.defer
+
+mypy/semanal_main.py
+line: 294-295
+function: process_top_level_function
+
+mypy/semanal.py
+line: 5990-6004
+function: SemanticAnalyzer.process_placeholder
+~~~
+
+CoSIL 推理片段：
+
+~~~text
+Based on the bug report and traceback, the crash occurs during semantic analysis when attempting to defer in the final iteration. The error originates in mypy/semanal.py at the defer method, with the call chain involving mypy/semanal_main.py and mypy/build.py.
+
+mypy/semanal.py
+mypy/semanal_main.py
+mypy/build.py
+mypy/semanal_pass1.py
+mypy/semanal_shared.py
+~~~
+
+分析：失败核心是 traceback 表层文件与真实语义修复点不一致。LocAgent/CoSIL/GraphLocator 都集中在 `mypy/semanal.py`、`semanal_main.py`、`build.py`，但 gold 是 `mypy/types.py`。这类 mypy crash 需要从错误栈中的 defer/final iteration 上升到类型对象和类型变量表达，而不是把最后抛错处当 patch target。
+
+#### 样本 `tailwindlabs__tailwindcss-5470`：TypeScript / `tailwindlabs/tailwindcss`
+
+Issue 真实问题：禁用某些 opacity plugin 后，使用 CSS custom property/function 定义的颜色失效。复现入口是 Tailwind Play；Issue 还给了一个历史 demo repo 和一个 GitHub blob 链接，指向旧的 `src/plugins/backgroundColor.js#L11`。真实修复点不是这个旧插件文件，而是当前仓库中的 `src/corePlugins.js`，需要在 opacity disabled 的早返回路径中正确调用 `toColorValue(value)`。
+
+URL 证据：
+- https://play.tailwindcss.com/YVjDQE13bj
+- https://github.com/adamwathan/tailwind-css-variable-text-opacity-demo
+- https://github.com/tailwindlabs/tailwindcss/blob/691ed02f6352da17048dd14f742f7c82919e1455/src/plugins/backgroundColor.js#L11
+
+Gold 文件：
+- `src/corePlugins.js`
+
+| Baseline | File REC@All | Top 预测文件 |
+|---|---:|---|
+| LocAgent | 100.00 | `src/util/toColorValue.js`, `src/corePlugins.js` |
+| CoSIL | 0.00 | `src/plugins/backgroundColor.js`, `src/plugins/textColor.js`, `src/plugins/ringColor.js`, `src/plugins/borderColor.js`, `src/plugins/divideColor.js` |
+| GraphLocator | 0.00 | `integrations/tailwindcss-cli/src/index.css`, `tests/fixtures/tailwind-output-no-color-opacity.css`, `src/util/responsive.js`, `src/util/withAlphaVariable.js`, `github/workflows/nodejs.yml` |
+| GALA | 100.00 | `src/util/withAlphaVariable.js`, `src/corePlugins.js`, `src/util/pluginUtils.js` |
+
+LocAgent 输出片段：
+
+~~~text
+Problem Summary:
+When an opacity plugin is disabled, the color plugins return value directly as the CSS property value. For colors defined as functions, this is a bug because value is the function itself, not a color string. The function is never invoked.
+
+The fix is to replace bare value with toColorValue(value) in each early-return path. toColorValue handles function-based colors correctly by calling maybeFunction({}).
+
+src/util/toColorValue.js
+function: toColorValue
+line: 1-3
+
+src/corePlugins.js
+function: backgroundColor
+line: 1270-1287
+function: textColor
+line: 1537-1554
+~~~
+
+CoSIL 推理片段：
+
+~~~text
+The bug specifically mentions that plugins are not calling withAlphaVariable() when opacity plugins are disabled.
+
+src/plugins/backgroundColor.js
+src/plugins/textColor.js
+src/plugins/borderColor.js
+src/plugins/divideColor.js
+src/plugins/ringColor.js
+
+backgroundColor.js is directly mentioned in the bug report, and other color plugins follow similar patterns.
+~~~
+
+分析：这个样本体现 URL 角色混合：play.tailwindcss 是复现，GitHub blob 指向 `backgroundColor.js`，但 gold 在 `src/corePlugins.js`。CoSIL 被 blob URL 诱导到 `src/plugins/backgroundColor.js` 等旧路径；LocAgent/GALA 通过 opacity/custom property 语义扩展到 `corePlugins.js` 成功。这里需要判断 code URL 是历史实现/相关证据还是当前仓库 patch target。
+
+#### 样本 `webpack__webpack-14782`：JavaScript / `webpack/webpack`
+
+Issue 真实问题：Module Federation 在 `strictVersion` mismatch 时，错误消息没有说明冲突版本来自哪个 source/package。Issue 附了错误信息截图。真实修复点在 runtime 代码 `lib/sharing/ConsumeSharedRuntimeModule.js`，需要让 singleton strict version 的 invalid version message 也带上来源信息。
+
+URL 证据：
+- https://user-images.githubusercontent.com/1610882/112955615-4a96c600-9148-11eb-8d8d-7aa08ed995ac.png
+
+图片证据：
+- https://user-images.githubusercontent.com/1610882/112955615-4a96c600-9148-11eb-8d8d-7aa08ed995ac.png
+
+Gold 文件：
+- `lib/sharing/ConsumeSharedRuntimeModule.js`
+
+| Baseline | File REC@All | Top 预测文件 |
+|---|---:|---|
+| LocAgent | 100.00 | `lib/sharing/ConsumeSharedRuntimeModule.js`, `lib/sharing/ShareRuntimeModule.js`, `lib/sharing/ConsumeSharedModule.js` |
+| CoSIL | 0.00 | `lib/sharing/SharePlugin.js`, `lib/sharing/ConsumeSharedModule.js`, `lib/sharing/ProvideSharedModule.js` |
+| GraphLocator | 0.00 | `test/configCases/asset-modules/http-url/errors.webpack.lock.data/...`, `test/statsCases/module-not-found-error/webpack.config.js`, `examples/code-splitted-require.context-amd/template.md`, `examples/code-splitted-require.context-amd/webpack.config.js`, `examples/code-splitted-require.context/template.md` |
+| GALA | 100.00 | `lib/sharing/ConsumeSharedRuntimeModule.js`, `lib/sharing/ConsumeSharedPlugin.js`, `lib/sharing/utils.js`, `lib/sharing/ConsumeSharedModule.js`, `lib/container/ModuleFederationPlugin.js` |
+
+LocAgent 输出片段：
+
+~~~text
+The from property is set in ShareRuntimeModule.js when a module is registered. It's already available as versions[key].from on each entry in the shared scope. The getInvalidVersionMessage already uses this to show Available versions with from info. The getInvalidSingletonVersionMessage does NOT include this information, which is the core of the issue.
+
+Execution Flow:
+1. A module requests a shared module with strictVersion: true and singleton: true
+2. ConsumeSharedModule.codeGeneration() generates code calling loadStrictSingletonVersionCheck
+3. At runtime, these call getStrictSingletonVersion()
+4. If unsatisfied, it throws getInvalidSingletonVersionMessage(), which lacks source package info
+~~~
+
+CoSIL 推理片段：
+
+~~~text
+lib/sharing/SingletonVersionHelper.js
+lib/sharing/ProvideSharedModule.js
+lib/sharing/ConsumeSharedModule.js
+lib/sharing/SharePlugin.js
+lib/sharing/versionHelpers.js
+~~~
+
+分析：图片是错误信息截图，真正线索是 Module Federation、strictVersion mismatch、consume shared runtime。LocAgent/GALA 成功命中 `ConsumeSharedRuntimeModule.js`；CoSIL 停在 `SharePlugin/ConsumeSharedModule/ProvideSharedModule`，GraphLocator 偏到测试和示例文件。这里说明图片 OCR/错误消息抽取必须转成 runtime module 语义，而不是只加入“error message”文本。
+
+### 6.7 对 022 文档结论的补充
+
+SWE Clean15 的主要矛盾是图片/UI/渲染证据如何映射到组件、状态和渲染引擎；这个 Omni60 Mimo 包显示出的主要矛盾是跨语言 URL 与复现证据如何映射到代码结构。两者共同指向同一个框架需求：先做证据角色识别，再做语言路由和图检索。具体来说：
+
+1. 对 URL 先分类：playground/repl、GitHub blob、issue/PR/commit、文档/API、图片 URL。不同 URL 不能统一当普通文本。
+
+2. 对语言做 router：Java 走 facade/internal/helper 调用链；Python 走 traceback 到 semantic type/dataflow 的反向解释；TypeScript/Babel/Tailwind 走 parser/compiler/plugin pipeline；JavaScript/Webpack/Prettier 走 runtime/formatter/plugin pipeline。
+
+3. 对图片做角色识别：SWE 里图片多是 UI/Canvas/PDF/Markdown 渲染症状；Omni 里图片少，多是错误输出截图。图片处理的目标不是生成描述，而是抽取可检索的错误文本、UI 状态、组件名、route、配置项。
+
+4. 对 Agent 搜索增加 verifier：如果预测只命中 traceback 抛错文件、URL 直接指向文件或测试 fixture，应强制执行一次“证据文件是否 patch target”的检查，并沿调用链/数据流扩展到真正修改点。
+
+
+## 7. 对现有表格的修正结论
 
 旧表只看了 REC@All，容易得出“某类 URL/图片整体好或坏”的结论。加入 Mimo-v2.5 和真实轨迹后，应改成下面这组判断：
 
@@ -294,7 +592,7 @@ lib/Renderer.js
 3. 图片的价值取决于能否转为可执行查询。Markdown/Canvas 更容易转成 token/API/grammar；Web UI 和 PDF 需要 route/component/layout engine 的跨层映射。
 4. Baseline 的差异主要在证据利用方式：LocAgent 能通过工具搜索修正部分入口，但容易过宽；CoSIL 依赖一次性文件判断，容易被关键词牵引；GraphLocator 对初始种子敏感；GALA/BM25 在词面强的样本上稳定，但对业务流和视觉布局理解不足。
 
-## 7. 后续框架设计建议
+## 8. 后续框架设计建议
 
 应把多模态证据先转换成结构化 evidence graph，再交给 Agent 搜索：
 

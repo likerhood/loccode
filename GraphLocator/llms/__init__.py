@@ -57,6 +57,60 @@ def _empty_response_retry_sleep() -> float:
         return 5.0
 
 
+def _connection_error_retries() -> int:
+    try:
+        return max(0, int(os.environ.get("LLM_CONNECTION_ERROR_RETRIES", "8")))
+    except ValueError:
+        return 8
+
+
+def _connection_error_retry_sleeps() -> list[float]:
+    raw = os.environ.get("LLM_CONNECTION_ERROR_RETRY_SLEEPS", "30,50,60,100")
+    sleeps: list[float] = []
+    for item in raw.split(","):
+        item = item.strip()
+        if not item:
+            continue
+        try:
+            sleeps.append(max(0.0, float(item)))
+        except ValueError:
+            return []
+    return sleeps
+
+
+def _connection_error_retry_sleep() -> float:
+    try:
+        return max(0.0, float(os.environ.get("LLM_CONNECTION_ERROR_RETRY_SLEEP", "10")))
+    except ValueError:
+        return 10.0
+
+
+def _connection_error_sleep_for_attempt(attempt: int) -> float:
+    sleeps = _connection_error_retry_sleeps()
+    if sleeps:
+        return sleeps[min(attempt, len(sleeps) - 1)]
+    return _connection_error_retry_sleep() * min(attempt + 1, 6)
+
+
+def _is_transient_llm_connection_error(exc: BaseException) -> bool:
+    text = f"{type(exc).__name__}: {exc}".lower()
+    markers = (
+        "connection error",
+        "apiconnectionerror",
+        "connecterror",
+        "connection reset",
+        "connection aborted",
+        "remote protocol error",
+        "read timeout",
+        "timeout",
+        "temporarily unavailable",
+        "server disconnected",
+        "tls",
+        "ssl",
+    )
+    return any(marker in text for marker in markers)
+
+
 def _message_has_tool_call(message: dict) -> bool:
     tool_calls = message.get("tool_calls") or message.get("function_call")
     return bool(tool_calls)
@@ -95,7 +149,8 @@ def get_llm_response(model_name: str, messages, with_tool=False, tools=None,
     endpoint_kwargs = _litellm_endpoint_kwargs()
 
     def _call_model(model_name, messages, temperature, tools):
-        request_retries = max(5, _empty_response_retries() + 1)
+        connection_retries = _connection_error_retries()
+        request_retries = max(5, _empty_response_retries() + 1, connection_retries + 1)
         retry_sleep = _empty_response_retry_sleep()
         for attempt in range(request_retries):
             try:
@@ -134,8 +189,14 @@ def get_llm_response(model_name: str, messages, with_tool=False, tools=None,
                 )
                 time.sleep(retry_sleep)
             except Exception as e:
-                print(f"Error in {model_name} request via {request_model_name}: {e}. Retrying...")
-                time.sleep(5)
+                if not _is_transient_llm_connection_error(e) or attempt >= connection_retries:
+                    raise
+                sleep_for = _connection_error_sleep_for_attempt(attempt)
+                print(
+                    f"Transient LLM connection error in {model_name} request via {request_model_name}: {e}. "
+                    f"Retrying {attempt + 1}/{connection_retries} after {sleep_for}s..."
+                )
+                time.sleep(sleep_for)
         raise Exception(f"Failed to get a response from {model_name} after {request_retries} attempts.")
 
     llm_response, decoded_answer = _call_model(model_name, messages, temperature, tool_list)

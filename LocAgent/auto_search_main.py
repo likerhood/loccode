@@ -115,6 +115,27 @@ def llm_connection_error_retry_sleep() -> float:
         return 10.0
 
 
+def llm_connection_error_retry_sleeps() -> list[float]:
+    raw = os.getenv("LLM_CONNECTION_ERROR_RETRY_SLEEPS", "30,50,60,100")
+    sleeps: list[float] = []
+    for item in raw.split(","):
+        item = item.strip()
+        if not item:
+            continue
+        try:
+            sleeps.append(max(0.0, float(item)))
+        except ValueError:
+            return []
+    return sleeps
+
+
+def llm_connection_error_sleep_for_attempt(attempt: int) -> float:
+    sleeps = llm_connection_error_retry_sleeps()
+    if sleeps:
+        return sleeps[min(attempt, len(sleeps) - 1)]
+    return llm_connection_error_retry_sleep() * min(attempt + 1, 6)
+
+
 def is_transient_llm_connection_error(exc: BaseException) -> bool:
     text = f"{type(exc).__name__}: {exc}".lower()
     transient_markers = (
@@ -364,7 +385,6 @@ def auto_search_process(result_queue,
         empty_retries = llm_empty_response_retries()
         connection_retries = llm_connection_error_retries()
         retry_sleep = llm_empty_response_retry_sleep()
-        connection_retry_sleep = llm_connection_error_retry_sleep()
         response_retries = max(empty_retries, connection_retries)
         for response_attempt in range(response_retries + 1):
             try:
@@ -421,7 +441,7 @@ def auto_search_process(result_queue,
                 return
             except Exception as e:
                 if is_transient_llm_connection_error(e) and response_attempt < connection_retries:
-                    sleep_for = connection_retry_sleep * min(response_attempt + 1, 6)
+                    sleep_for = llm_connection_error_sleep_for_attempt(response_attempt)
                     logging.warning(
                         "Transient LLM connection error from %s; retrying %s/%s after %.1fs: %s",
                         request_model_name,

@@ -42,6 +42,43 @@ def _empty_response_retry_sleep() -> float:
         return 5.0
 
 
+def _connection_error_retries() -> int:
+    raw = os.environ.get("LLM_CONNECTION_ERROR_RETRIES", "8")
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return 8
+
+
+def _connection_error_retry_sleeps() -> list[float]:
+    raw = os.environ.get("LLM_CONNECTION_ERROR_RETRY_SLEEPS", "30,50,60,100")
+    sleeps: list[float] = []
+    for item in raw.split(","):
+        item = item.strip()
+        if not item:
+            continue
+        try:
+            sleeps.append(max(0.0, float(item)))
+        except ValueError:
+            return []
+    return sleeps
+
+
+def _connection_error_retry_sleep() -> float:
+    raw = os.environ.get("LLM_CONNECTION_ERROR_RETRY_SLEEP", "10")
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        return 10.0
+
+
+def _connection_error_sleep_for_attempt(attempt: int) -> float:
+    sleeps = _connection_error_retry_sleeps()
+    if sleeps:
+        return sleeps[min(attempt, len(sleeps) - 1)]
+    return _connection_error_retry_sleep() * min(attempt + 1, 6)
+
+
 def _extract_first_message_content(response_data):
     if not isinstance(response_data, dict):
         return ""
@@ -122,9 +159,9 @@ def send_chat_completion(
         request_timeout = 180.0
 
     try:
-        max_retries = max(1, int(str(os.getenv("GALA_REQUEST_MAX_RETRIES", "3")).strip()))
+        max_retries = max(1, int(str(os.getenv("GALA_REQUEST_MAX_RETRIES", str(_connection_error_retries()))).strip()))
     except Exception:
-        max_retries = 3
+        max_retries = _connection_error_retries()
 
     try:
         retry_delay = float(str(os.getenv("GALA_REQUEST_RETRY_DELAY", "2")).strip())
@@ -173,7 +210,8 @@ def send_chat_completion(
         payload["max_tokens"] = int(max_tokens)
 
     last_error = None
-    total_attempts = max(max_retries, _empty_response_retries() + 1)
+    connection_retries = _connection_error_retries()
+    total_attempts = max(max_retries, _empty_response_retries() + 1, connection_retries + 1)
     empty_retry_delay = _empty_response_retry_sleep()
     for attempt in range(total_attempts):
         try:
@@ -202,7 +240,8 @@ def send_chat_completion(
             is_last_attempt = attempt == total_attempts - 1
             if is_last_attempt:
                 break
-            time.sleep(retry_delay)
+            sleep_for = _connection_error_sleep_for_attempt(attempt)
+            time.sleep(sleep_for if sleep_for else retry_delay)
 
     raise last_error
 

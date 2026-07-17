@@ -119,6 +119,129 @@ build_api_no_proxy() {
   echo "${base}"
 }
 
+redact_api_key() {
+  local key="${1:-}"
+  if [[ "${#key}" -le 10 ]]; then
+    echo "<hidden>"
+  else
+    echo "${key:0:4}...${key: -4}"
+  fi
+}
+
+declare -a LLM_ENDPOINT_NAMES=()
+declare -a LLM_ENDPOINT_BASE_URLS=()
+declare -a LLM_ENDPOINT_API_KEYS=()
+declare -a LLM_ENDPOINT_MODELS=()
+SELECTED_LLM_ENDPOINT_INDEX=-1
+
+parse_llm_endpoints() {
+  local raw="${LLM_ENDPOINTS:-}"
+  local entry name base_url api_key model
+  LLM_ENDPOINT_NAMES=()
+  LLM_ENDPOINT_BASE_URLS=()
+  LLM_ENDPOINT_API_KEYS=()
+  LLM_ENDPOINT_MODELS=()
+  [[ -z "${raw}" ]] && return 0
+
+  IFS=';' read -r -a _llm_endpoint_entries <<< "${raw}"
+  for entry in "${_llm_endpoint_entries[@]}"; do
+    [[ -z "${entry//[[:space:]]/}" ]] && continue
+    IFS='|' read -r name base_url api_key model _extra <<< "${entry}"
+    if [[ -z "${name:-}" || -z "${base_url:-}" || -z "${api_key:-}" || -z "${model:-}" || -n "${_extra:-}" ]]; then
+      cat >&2 <<EOF
+ERROR: invalid LLM_ENDPOINTS entry:
+  ${entry}
+
+Expected format:
+  name|base_url|api_key|model;name2|base_url2|api_key2|model2
+EOF
+      exit 2
+    fi
+    LLM_ENDPOINT_NAMES+=("${name}")
+    LLM_ENDPOINT_BASE_URLS+=("${base_url}")
+    LLM_ENDPOINT_API_KEYS+=("${api_key}")
+    LLM_ENDPOINT_MODELS+=("${model}")
+  done
+}
+
+llm_endpoint_count() {
+  echo "${#LLM_ENDPOINT_NAMES[@]}"
+}
+
+apply_llm_endpoint() {
+  local idx="$1"
+  SELECTED_LLM_ENDPOINT_INDEX="${idx}"
+  BASE_URL="${LLM_ENDPOINT_BASE_URLS[$idx]}"
+  API_KEY="${LLM_ENDPOINT_API_KEYS[$idx]}"
+  MODEL_NAME="${LLM_ENDPOINT_MODELS[$idx]}"
+  LITELLM_MODEL_NAME="${MODEL_NAME}"
+  if [[ "${LITELLM_MODEL_NAME}" != */* ]]; then
+    LITELLM_MODEL_NAME="openai/${LITELLM_MODEL_NAME}"
+  fi
+  API_NO_PROXY_VALUE="${NO_PROXY:-${no_proxy:-}}"
+  if [[ "${LLM_BASELINE_SELECTED}" == "1" ]] && is_truthy "${API_NO_PROXY}"; then
+    API_NO_PROXY_VALUE="$(build_api_no_proxy)"
+  fi
+}
+
+preflight_llm_endpoint() {
+  local idx="$1"
+  local name base_url api_key model host output status
+  name="${LLM_ENDPOINT_NAMES[$idx]}"
+  base_url="${LLM_ENDPOINT_BASE_URLS[$idx]}"
+  api_key="${LLM_ENDPOINT_API_KEYS[$idx]}"
+  model="${LLM_ENDPOINT_MODELS[$idx]}"
+  host="$(api_host_from_url "${base_url}")"
+
+  echo "[llm-endpoint] checking ${name}: base=${base_url} model=${model} key=$(redact_api_key "${api_key}")"
+  if is_truthy "${DRY_RUN}"; then
+    echo "[llm-endpoint] dry-run selects ${name}"
+    return 0
+  fi
+
+  set +e
+  output="$(
+    NO_PROXY="$(append_csv_unique "${NO_PROXY:-${no_proxy:-}}" "${host}")" \
+    no_proxy="$(append_csv_unique "${NO_PROXY:-${no_proxy:-}}" "${host}")" \
+    "${PYTHON:-python3}" "${ROOT_DIR}/scripts/check_openai_compatible_api.py" \
+      --base-url "${base_url}" \
+      --api-key "${api_key}" \
+      --model "${model#openai/}" \
+      --timeout "${API_PREFLIGHT_TIMEOUT}" 2>&1
+  )"
+  status=$?
+  set -e
+  if [[ "${status}" == "0" ]]; then
+    echo "[llm-endpoint] ${name} preflight OK"
+    return 0
+  fi
+  echo "[llm-endpoint] ${name} preflight failed: ${output}" >&2
+  return 1
+}
+
+select_working_llm_endpoint_from() {
+  local start_idx="${1:-0}"
+  local count idx
+  count="$(llm_endpoint_count)"
+  [[ "${count}" -eq 0 ]] && return 1
+  for ((idx=start_idx; idx<count; idx++)); do
+    if preflight_llm_endpoint "${idx}"; then
+      apply_llm_endpoint "${idx}"
+      echo "[llm-endpoint] selected ${LLM_ENDPOINT_NAMES[$idx]}: base=${BASE_URL} model=${MODEL_NAME} key=$(redact_api_key "${API_KEY}")"
+      return 0
+    fi
+  done
+  return 1
+}
+
+quota_or_auth_failure_in_logs() {
+  local path="$1"
+  [[ -e "${path}" ]] || return 1
+  rg -i \
+    "insufficient[_ -]?quota|quota exceeded|quota_exceeded|insufficient balance|balance not enough|no credit|credit exhausted|out of quota|余额不足|额度不足|额度已用完|欠费|invalid api key|unauthorized|authentication failed|permission denied|HTTP[^[:alnum:]]*(401|403)|\\b(401|403)\\b" \
+    "${path}" >/dev/null 2>&1
+}
+
 env_python() {
   local env_name="$1"
   echo "${CONDA_ENV_ROOT%/}/${env_name}/bin/python"
@@ -227,7 +350,18 @@ run_logged() {
   echo
   echo "========== ${name} =========="
   echo "[log] ${logfile}"
-  echo "+ $*"
+  printf '+'
+  for arg in "$@"; do
+    case "${arg}" in
+      *API_KEY=*|*api_key=*|*Api-Key=*|*Authorization:*)
+        printf ' %q' "${arg%%=*}=<hidden>"
+        ;;
+      *)
+        printf ' %q' "${arg}"
+        ;;
+    esac
+  done
+  echo
   if is_truthy "${DRY_RUN}"; then
     return 0
   fi
@@ -618,6 +752,15 @@ if [[ "${BASELINES}" =~ (^|[[:space:]])(locagent|cosil|graphlocator|gala)([[:spa
   LLM_BASELINE_SELECTED=1
 fi
 
+parse_llm_endpoints
+if [[ "${LLM_BASELINE_SELECTED}" == "1" && "$(llm_endpoint_count)" -gt 0 ]]; then
+  echo "[llm-endpoint] LLM_ENDPOINTS configured: $(llm_endpoint_count) endpoint(s)"
+  if ! select_working_llm_endpoint_from 0; then
+    echo "ERROR: no LLM endpoint passed preflight." >&2
+    exit 2
+  fi
+fi
+
 if [[ "${LLM_BASELINE_SELECTED}" == "1" ]]; then
   require_nonempty "BASE_URL" "${BASE_URL}"
   require_nonempty "API_KEY" "${API_KEY}"
@@ -638,15 +781,19 @@ if [[ "${LLM_BASELINE_SELECTED}" == "1" ]] && is_truthy "${API_NO_PROXY}"; then
   API_NO_PROXY_VALUE="$(build_api_no_proxy)"
 fi
 
-RUN_MODEL_NAME="${MODEL_NAME}"
-if baseline_enabled cosil && ! grep -q "COSIL_BACKEND_MODEL" "${ROOT_DIR}/CoSIL/CoSIL/util/model.py" 2>/dev/null; then
-  echo "[compat warn] CoSIL does not support COSIL_BACKEND_MODEL yet; using MODEL=${LITELLM_MODEL_NAME} for this run." >&2
-  RUN_MODEL_NAME="${LITELLM_MODEL_NAME}"
-fi
-if baseline_enabled graphlocator && ! grep -q "GRAPHLOCATOR_BACKEND_MODEL" "${ROOT_DIR}/GraphLocator/llms/__init__.py" 2>/dev/null; then
-  echo "[compat warn] GraphLocator does not support GRAPHLOCATOR_BACKEND_MODEL yet; using MODEL=${LITELLM_MODEL_NAME} for this run." >&2
-  RUN_MODEL_NAME="${LITELLM_MODEL_NAME}"
-fi
+refresh_run_model_name() {
+  RUN_MODEL_NAME="${MODEL_NAME}"
+  if baseline_enabled cosil && ! grep -q "COSIL_BACKEND_MODEL" "${ROOT_DIR}/CoSIL/CoSIL/util/model.py" 2>/dev/null; then
+    echo "[compat warn] CoSIL does not support COSIL_BACKEND_MODEL yet; using MODEL=${LITELLM_MODEL_NAME} for this run." >&2
+    RUN_MODEL_NAME="${LITELLM_MODEL_NAME}"
+  fi
+  if baseline_enabled graphlocator && ! grep -q "GRAPHLOCATOR_BACKEND_MODEL" "${ROOT_DIR}/GraphLocator/llms/__init__.py" 2>/dev/null; then
+    echo "[compat warn] GraphLocator does not support GRAPHLOCATOR_BACKEND_MODEL yet; using MODEL=${LITELLM_MODEL_NAME} for this run." >&2
+    RUN_MODEL_NAME="${LITELLM_MODEL_NAME}"
+  fi
+}
+
+refresh_run_model_name
 
 mkdir -p "${LOG_DIR}" "${ROOT_DIR}/logs"
 
@@ -747,58 +894,90 @@ if is_truthy "${PARALLEL}"; then
   RUN_SCRIPT="${ROOT_DIR}/run_omnigirl_full_baselines_parallel.sh"
 fi
 
-run_logged "run_omnigirl_full" \
-  env \
-    NO_PROXY="${API_NO_PROXY_VALUE}" \
-    no_proxy="${API_NO_PROXY_VALUE}" \
-    CONDA_ENV_ROOT="${CONDA_ENV_ROOT}" \
-    EXP_NAME="${EXP_NAME}" \
-    SOURCE_JSONL="${SOURCE_JSONL}" \
-    STRUCTURE_DIR="${STRUCTURE_DIR}" \
-    COSIL_STRUCTURE_DIR="${COSIL_STRUCTURE_DIR}" \
-    SAMPLE_SIZE="$(count_jsonl_rows "${SOURCE_JSONL}")" \
-    SEED="${SEED}" \
-    USED_LIST="${USED_LIST}" \
-    BASELINES="${BASELINES}" \
-    RUN_LOCAGENT="$(baseline_enabled locagent && echo 1 || echo 0)" \
-    RUN_COSIL="$(baseline_enabled cosil && echo 1 || echo 0)" \
-    RUN_GRAPHLOCATOR="$(baseline_enabled graphlocator && echo 1 || echo 0)" \
-    RUN_GALA="$(baseline_enabled gala && echo 1 || echo 0)" \
-    RUN_MMIR="$(baseline_enabled mmir && echo 1 || echo 0)" \
-    RUN_MMIR_METHODS="${RUN_MMIR_METHODS}" \
-    COSIL_MAX_EMPTY_RATE="${COSIL_MAX_EMPTY_RATE}" \
-    LLM_FAIL_FAST="${LLM_FAIL_FAST}" \
-    LLM_FAIL_FAST_PATTERNS="${LLM_FAIL_FAST_PATTERNS}" \
-    API_PREFLIGHT=0 \
-    HF_ENDPOINT="${HF_ENDPOINT}" \
-    OPENAI_API_BASE="${BASE_URL}" \
-    OPENAI_API_KEY="${API_KEY}" \
-    MODEL="${RUN_MODEL_NAME}" \
-    LITELLM_MODEL="${LITELLM_MODEL_NAME}" \
-    LOCAGENT_BACKEND_MODEL="${LITELLM_MODEL_NAME}" \
-    COSIL_BACKEND_MODEL="${LITELLM_MODEL_NAME}" \
-    GRAPHLOCATOR_BACKEND_MODEL="${LITELLM_MODEL_NAME}" \
-    VLM_MODEL="${MODEL_NAME}" \
-    TEXT_MODEL_NAME="${MODEL_NAME}" \
-    MULADAPTER_MODEL="${MODEL_NAME}" \
-    MULADAPTER_BASE_URL="${BASE_URL}" \
-    MULADAPTER_API_KEY="${API_KEY}" \
-    VLM_BASE_URL="${BASE_URL}" \
-    VLM_API_KEY="${API_KEY}" \
-    TEXT_BASE_URL="${BASE_URL}" \
-    TEXT_API_KEY="${API_KEY}" \
-    DENSE_DEVICE="${DENSE_DEVICE}" \
-    DENSE_BATCH_SIZE="${DENSE_BATCH_SIZE}" \
-    DENSE_DEVICE_AUTO_FALLBACK="${DENSE_DEVICE_AUTO_FALLBACK}" \
-    FORCE_RERUN="${FORCE_RERUN}" \
-    CLEAN_FULL="${CLEAN_FULL}" \
-    MAX_PARALLEL_BASELINES="${MAX_PARALLEL_BASELINES}" \
-    LIVE_LOGS="${LIVE_LOGS}" \
-    LIVE_LOG_LINES="${LIVE_LOG_LINES}" \
-    STATUS_INTERVAL="${STATUS_INTERVAL}" \
-    FAIL_FAST_ON_BASELINE_FAILURE="${FAIL_FAST_ON_BASELINE_FAILURE}" \
-    DRY_RUN="${DRY_RUN}" \
-    bash "${RUN_SCRIPT}"
+run_omnigirl_full_once() {
+  refresh_run_model_name
+  echo "[llm-endpoint] running with base=${BASE_URL} model=${MODEL_NAME} key=$(redact_api_key "${API_KEY}")"
+  run_logged "run_omnigirl_full" \
+    env \
+      NO_PROXY="${API_NO_PROXY_VALUE}" \
+      no_proxy="${API_NO_PROXY_VALUE}" \
+      CONDA_ENV_ROOT="${CONDA_ENV_ROOT}" \
+      EXP_NAME="${EXP_NAME}" \
+      SOURCE_JSONL="${SOURCE_JSONL}" \
+      STRUCTURE_DIR="${STRUCTURE_DIR}" \
+      COSIL_STRUCTURE_DIR="${COSIL_STRUCTURE_DIR}" \
+      SAMPLE_SIZE="$(count_jsonl_rows "${SOURCE_JSONL}")" \
+      SEED="${SEED}" \
+      USED_LIST="${USED_LIST}" \
+      BASELINES="${BASELINES}" \
+      RUN_LOCAGENT="$(baseline_enabled locagent && echo 1 || echo 0)" \
+      RUN_COSIL="$(baseline_enabled cosil && echo 1 || echo 0)" \
+      RUN_GRAPHLOCATOR="$(baseline_enabled graphlocator && echo 1 || echo 0)" \
+      RUN_GALA="$(baseline_enabled gala && echo 1 || echo 0)" \
+      RUN_MMIR="$(baseline_enabled mmir && echo 1 || echo 0)" \
+      RUN_MMIR_METHODS="${RUN_MMIR_METHODS}" \
+      COSIL_MAX_EMPTY_RATE="${COSIL_MAX_EMPTY_RATE}" \
+      LLM_FAIL_FAST="${LLM_FAIL_FAST}" \
+      LLM_FAIL_FAST_PATTERNS="${LLM_FAIL_FAST_PATTERNS}" \
+      API_PREFLIGHT=0 \
+      HF_ENDPOINT="${HF_ENDPOINT}" \
+      OPENAI_API_BASE="${BASE_URL}" \
+      OPENAI_API_KEY="${API_KEY}" \
+      MODEL="${RUN_MODEL_NAME}" \
+      LITELLM_MODEL="${LITELLM_MODEL_NAME}" \
+      LOCAGENT_BACKEND_MODEL="${LITELLM_MODEL_NAME}" \
+      COSIL_BACKEND_MODEL="${LITELLM_MODEL_NAME}" \
+      GRAPHLOCATOR_BACKEND_MODEL="${LITELLM_MODEL_NAME}" \
+      VLM_MODEL="${MODEL_NAME}" \
+      TEXT_MODEL_NAME="${MODEL_NAME}" \
+      MULADAPTER_MODEL="${MODEL_NAME}" \
+      MULADAPTER_BASE_URL="${BASE_URL}" \
+      MULADAPTER_API_KEY="${API_KEY}" \
+      VLM_BASE_URL="${BASE_URL}" \
+      VLM_API_KEY="${API_KEY}" \
+      TEXT_BASE_URL="${BASE_URL}" \
+      TEXT_API_KEY="${API_KEY}" \
+      DENSE_DEVICE="${DENSE_DEVICE}" \
+      DENSE_BATCH_SIZE="${DENSE_BATCH_SIZE}" \
+      DENSE_DEVICE_AUTO_FALLBACK="${DENSE_DEVICE_AUTO_FALLBACK}" \
+      FORCE_RERUN="${FORCE_RERUN}" \
+      CLEAN_FULL="${CLEAN_FULL}" \
+      MAX_PARALLEL_BASELINES="${MAX_PARALLEL_BASELINES}" \
+      LIVE_LOGS="${LIVE_LOGS}" \
+      LIVE_LOG_LINES="${LIVE_LOG_LINES}" \
+      STATUS_INTERVAL="${STATUS_INTERVAL}" \
+      FAIL_FAST_ON_BASELINE_FAILURE="${FAIL_FAST_ON_BASELINE_FAILURE}" \
+      DRY_RUN="${DRY_RUN}" \
+      bash "${RUN_SCRIPT}"
+}
+
+run_status=0
+while true; do
+  set +e
+  run_omnigirl_full_once
+  run_status=$?
+  set -e
+  if [[ "${run_status}" == "0" ]]; then
+    break
+  fi
+
+  if [[ "$(llm_endpoint_count)" -le 0 ]]; then
+    exit "${run_status}"
+  fi
+  if ! quota_or_auth_failure_in_logs "${LOG_DIR}"; then
+    echo "[llm-endpoint] run failed, but no quota/auth failure was detected in ${LOG_DIR}; not switching endpoint." >&2
+    exit "${run_status}"
+  fi
+
+  next_idx=$((SELECTED_LLM_ENDPOINT_INDEX + 1))
+  echo "[llm-endpoint] detected quota/auth failure in logs; trying next endpoint from index ${next_idx}."
+  if ! select_working_llm_endpoint_from "${next_idx}"; then
+    echo "[llm-endpoint] no remaining endpoint passed preflight after quota/auth failure." >&2
+    exit "${run_status}"
+  fi
+  refresh_run_model_name
+  echo "[llm-endpoint] rerunning failed supervisor with ${LLM_ENDPOINT_NAMES[$SELECTED_LLM_ENDPOINT_INDEX]}."
+done
 
 echo
 echo "Done."

@@ -102,6 +102,7 @@ FORCE_CLEAN_SUBSET="${FORCE_CLEAN_SUBSET:-0}"
 DRY_RUN="${DRY_RUN:-0}"
 BASELINES="${BASELINES:-locagent cosil graphlocator gala mmir}"
 BASELINE_ENVS="${BASELINE_ENVS:-${BASELINES}}"
+CLEAN_PROGRESS_INTERVAL="${CLEAN_PROGRESS_INTERVAL:-25}"
 
 PYTHON_BIN_RESOLVED="$(detect_python_bin)"
 
@@ -122,6 +123,7 @@ Clean manifest: ${CLEAN_MANIFEST}
 Python for Clean15 builder: ${PYTHON_BIN_RESOLVED}
 Prepare full inputs: ${PREPARE_FULL_INPUTS}
 Force clean subset: ${FORCE_CLEAN_SUBSET}
+Clean progress interval: ${CLEAN_PROGRESS_INTERVAL}
 Dry run: ${DRY_RUN}
 EOF
 
@@ -177,12 +179,14 @@ fi
 if is_truthy "${FORCE_CLEAN_SUBSET}" || [[ ! -s "${CLEAN_SOURCE_JSONL}" ]]; then
   echo
   echo "========== Build OmniGIRL Clean15 subset =========="
-  run_cmd "${PYTHON_BIN_RESOLVED}" "${CLEAN_BUILDER}" \
+  echo "[data] This step maps gold patch lines to repo_structures. It can take several minutes on a busy CPU server."
+  run_cmd env PYTHONUNBUFFERED=1 "${PYTHON_BIN_RESOLVED}" "${CLEAN_BUILDER}" \
     --samples "${FULL_SOURCE_JSONL}" \
     --structure-dir "${FULL_STRUCTURE_DIR}" \
     --output-prefix "${CLEAN_PREFIX}" \
     --mode "${CLEAN_MODE}" \
     --max-gold "${MAX_GOLD}" \
+    --progress-interval "${CLEAN_PROGRESS_INTERVAL}" \
     --write-diagnostic
 else
   echo "[data] Clean15 subset already exists: ${CLEAN_SOURCE_JSONL}"

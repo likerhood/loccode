@@ -14,6 +14,7 @@ import importlib.util
 import json
 import re
 import sys
+import time
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -244,6 +245,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--max-gold", type=int, default=15, help="Maximum allowed gold count for each evaluated level.")
     parser.add_argument("--write-diagnostic", action="store_true", help="Also write the excluded samples JSONL.")
+    parser.add_argument(
+        "--progress-interval",
+        type=int,
+        default=0,
+        help="Print progress every N samples. 0 disables progress output.",
+    )
     return parser
 
 
@@ -253,6 +260,7 @@ def main() -> None:
     structure_dir = Path(args.structure_dir).resolve()
     output_prefix = Path(args.output_prefix).resolve()
     rows = load_jsonl(samples_path)
+    start_time = time.monotonic()
 
     kept: list[dict[str, Any]] = []
     excluded: list[dict[str, Any]] = []
@@ -260,7 +268,14 @@ def main() -> None:
     reason_counter: Counter[str] = Counter()
     total_counter: Counter[str] = Counter()
 
-    for row in rows:
+    if args.progress_interval > 0:
+        print(
+            f"[clean-subset] start total={len(rows)} samples={samples_path} "
+            f"structure_dir={structure_dir} mode={args.mode} max_gold={args.max_gold}",
+            flush=True,
+        )
+
+    for index, row in enumerate(rows, start=1):
         instance_id = str(row.get("instance_id", ""))
         files = sample_files(row)
         modules, functions, warnings = compute_gold_entities(instance_id, row.get("patch", ""), structure_dir)
@@ -295,6 +310,16 @@ def main() -> None:
         for reason in reasons:
             total_counter[reason] += 1
 
+        if args.progress_interval > 0 and (index == 1 or index % args.progress_interval == 0 or index == len(rows)):
+            elapsed = time.monotonic() - start_time
+            rate = index / elapsed if elapsed > 0 else 0.0
+            print(
+                "[clean-subset] "
+                f"processed={index}/{len(rows)} kept={len(kept)} excluded={len(excluded)} "
+                f"last={instance_id} elapsed={elapsed:.1f}s rate={rate:.2f}/s",
+                flush=True,
+            )
+
     output_prefix.parent.mkdir(parents=True, exist_ok=True)
     samples_out = Path(str(output_prefix) + ".samples.jsonl")
     ids_out = Path(str(output_prefix) + ".ids.txt")
@@ -327,12 +352,12 @@ def main() -> None:
     }
     manifest_out.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
-    print(f"[clean-subset] total={len(rows)} kept={len(kept)} excluded={len(excluded)}")
-    print(f"[clean-subset] samples:  {samples_out}")
-    print(f"[clean-subset] ids:      {ids_out}")
-    print(f"[clean-subset] manifest: {manifest_out}")
+    print(f"[clean-subset] total={len(rows)} kept={len(kept)} excluded={len(excluded)}", flush=True)
+    print(f"[clean-subset] samples:  {samples_out}", flush=True)
+    print(f"[clean-subset] ids:      {ids_out}", flush=True)
+    print(f"[clean-subset] manifest: {manifest_out}", flush=True)
     if args.write_diagnostic:
-        print(f"[clean-subset] excluded: {excluded_out}")
+        print(f"[clean-subset] excluded: {excluded_out}", flush=True)
 
 
 if __name__ == "__main__":

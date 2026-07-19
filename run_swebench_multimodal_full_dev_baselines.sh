@@ -72,6 +72,7 @@ CLEAN_FULL="${CLEAN_FULL:-0}"
 FORCE_RERUN="${FORCE_RERUN:-0}"
 FORCE_PREPARE="${FORCE_PREPARE:-0}"
 FORCE_STRUCTURES="${FORCE_STRUCTURES:-0}"
+SKIP_SHARED_PREPARE="${SKIP_SHARED_PREPARE:-0}"
 DRY_RUN="${DRY_RUN:-0}"
 COSIL_MAX_EMPTY_RATE="${COSIL_MAX_EMPTY_RATE:-0.30}"
 API_PREFLIGHT="${API_PREFLIGHT:-0}"
@@ -232,6 +233,46 @@ structure_rows() {
     find "${CANONICAL_STRUCTURE_DIR}" -maxdepth 1 -type f -name '*.json' | wc -l | tr -d ' '
   else
     echo 0
+  fi
+}
+
+require_shared_inputs_ready() {
+  local samples structures
+  samples="$(sample_rows)"
+  structures="$(structure_rows)"
+  if ! expected_sample_rows_ready; then
+    cat >&2 <<EOF
+ERROR: SKIP_SHARED_PREPARE=1 but canonical samples are not ready.
+
+Expected:
+  ${CANONICAL_SAMPLES}
+  rows: ${SAMPLE_SIZE}
+
+Found:
+  rows: ${samples}
+
+This usually means the parallel supervisor child job was started before the
+shared prepare finished, or this loccode copy does not contain prepared inputs.
+Run the supervisor without SKIP_SHARED_PREPARE, or prepare/copy the canonical
+data first.
+EOF
+    exit 2
+  fi
+  if [[ "${samples}" == "0" || "${structures}" -lt "${samples}" ]]; then
+    cat >&2 <<EOF
+ERROR: SKIP_SHARED_PREPARE=1 but canonical repo_structures are not ready.
+
+Expected:
+  ${CANONICAL_STRUCTURE_DIR}/*.json
+  files: at least ${samples}
+
+Found:
+  files: ${structures}
+
+Run the supervisor once with shared preparation enabled, or copy the prepared
+repo_structures into this loccode copy.
+EOF
+    exit 2
   fi
 }
 
@@ -459,6 +500,7 @@ OpenAI-compatible endpoint: ${OPENAI_API_BASE}
 Model: ${MODEL}
 VLM model: ${VLM_MODEL}
 Text model: ${TEXT_MODEL_NAME}
+Skip shared prepare: ${SKIP_SHARED_PREPARE}
 Dry run: ${DRY_RUN}
 EOF
 
@@ -478,7 +520,14 @@ if [[ -n "${SOURCE_JSONL}" ]]; then
   PREPARE_ARGS+=(--source-jsonl "${SOURCE_JSONL}")
 fi
 
-if ! is_truthy "${FORCE_PREPARE}" && expected_sample_rows_ready; then
+if is_truthy "${SKIP_SHARED_PREPARE}"; then
+  echo
+  echo "========== Skip shared sample/structure preparation =========="
+  require_shared_inputs_ready
+  echo "[skip] SKIP_SHARED_PREPARE=1."
+  echo "[skip] Found ${CANONICAL_SAMPLES} with $(sample_rows) rows."
+  echo "[skip] Found ${CANONICAL_STRUCTURE_DIR} with $(structure_rows) structure files."
+elif ! is_truthy "${FORCE_PREPARE}" && expected_sample_rows_ready; then
   echo
   echo "========== Skip Prepare canonical SWE-bench Multimodal dev =========="
   echo "[skip] Found ${CANONICAL_SAMPLES} with $(sample_rows) rows."
@@ -488,7 +537,9 @@ else
     run_shell "cd '${ROOT_DIR}/LocAgent' && OPENAI_API_BASE='${OPENAI_API_BASE}' OPENAI_API_KEY='${OPENAI_API_KEY}' '${LOCAGENT_PY}' ${PREPARE_ARGS[*]}"
 fi
 
-if ! is_truthy "${FORCE_STRUCTURES}" && [[ "$(structure_rows)" -ge "$(sample_rows)" ]] && [[ "$(sample_rows)" -gt 0 ]]; then
+if is_truthy "${SKIP_SHARED_PREPARE}"; then
+  :
+elif ! is_truthy "${FORCE_STRUCTURES}" && [[ "$(structure_rows)" -ge "$(sample_rows)" ]] && [[ "$(sample_rows)" -gt 0 ]]; then
   echo
   echo "========== Skip Build canonical repo_structures =========="
   echo "[skip] Found $(structure_rows) structure files for $(sample_rows) samples."

@@ -216,26 +216,31 @@ for baseline in ${BASELINES}; do
   case "${baseline}" in
     locagent)
       launch_job "locagent" \
+        SKIP_SHARED_PREPARE=1 \
         RUN_LOCAGENT=1 RUN_COSIL=0 RUN_GRAPHLOCATOR=0 RUN_GALA=0 RUN_MMIR=0 \
         LOCAGENT_NUM_PROCESSES="${LOCAGENT_NUM_PROCESSES:-1}" \
         LOCAGENT_NUM_SAMPLES="${LOCAGENT_NUM_SAMPLES:-1}"
       ;;
     cosil)
       launch_job "cosil" \
+        SKIP_SHARED_PREPARE=1 \
         RUN_LOCAGENT=0 RUN_COSIL=1 RUN_GRAPHLOCATOR=0 RUN_GALA=0 RUN_MMIR=0 \
         NUM_THREADS="${NUM_THREADS:-1}"
       ;;
     graphlocator)
       launch_job "graphlocator" \
+        SKIP_SHARED_PREPARE=1 \
         RUN_LOCAGENT=0 RUN_COSIL=0 RUN_GRAPHLOCATOR=1 RUN_GALA=0 RUN_MMIR=0
       ;;
     gala)
       launch_job "gala" \
+        SKIP_SHARED_PREPARE=1 \
         RUN_LOCAGENT=0 RUN_COSIL=0 RUN_GRAPHLOCATOR=0 RUN_GALA=1 RUN_MMIR=0 \
         MAX_WORKERS="${MAX_WORKERS:-1}"
       ;;
     mmir)
       launch_job "mmir" \
+        SKIP_SHARED_PREPARE=1 \
         RUN_LOCAGENT=0 RUN_COSIL=0 RUN_GRAPHLOCATOR=0 RUN_GALA=0 RUN_MMIR=1
       ;;
     *)

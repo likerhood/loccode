@@ -18,6 +18,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FULL_RUNNER="${ROOT_DIR}/server_check_setup_run_omnigirl_full.sh"
 CLEAN_BUILDER="${ROOT_DIR}/scripts/build_three_level_clean_subset.py"
+export GITHUB_MIRROR_PREFIX="${GITHUB_MIRROR_PREFIX:-${REPO_GITHUB_MIRROR_PREFIX:-https://gh.xmly.dev}}"
 
 is_truthy() {
   [[ "${1:-}" == "1" || "${1:-}" == "true" || "${1:-}" == "yes" ]]

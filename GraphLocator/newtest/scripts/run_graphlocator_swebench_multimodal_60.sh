@@ -94,8 +94,15 @@ fi
 
 export GIT_CONFIG_GLOBAL="${TEST_ROOT}/gitconfig"
 touch "${GIT_CONFIG_GLOBAL}"
-GITHUB_URL_PREFIX="${GITHUB_URL_PREFIX:-https://gh.xmly.dev/https://github.com}"
+GITHUB_MIRROR_PREFIX="${GITHUB_MIRROR_PREFIX:-${REPO_GITHUB_MIRROR_PREFIX:-https://gh.xmly.dev}}"
+if [[ -n "${GITHUB_MIRROR_PREFIX}" ]]; then
+  GITHUB_URL_PREFIX="${GITHUB_URL_PREFIX:-${GITHUB_MIRROR_PREFIX%/}/https://github.com}"
+else
+  GITHUB_URL_PREFIX="${GITHUB_URL_PREFIX:-}"
+fi
 if [[ -n "${GITHUB_URL_PREFIX}" ]]; then
+  # GIT_CONFIG_GLOBAL points at TEST_ROOT/gitconfig above, so this rewrite is
+  # scoped to this runner process tree and does not modify the user's ~/.gitconfig.
   git config --global "url.${GITHUB_URL_PREFIX%/}/.insteadOf" "https://github.com/"
 fi
 

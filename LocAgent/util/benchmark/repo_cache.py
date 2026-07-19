@@ -71,7 +71,16 @@ def repo_lock_path(cache_root: str, github_repo_path: str) -> str:
 
 
 def github_repo_url(github_repo_path: str) -> str:
-    return f"https://github.com/{github_repo_path}.git"
+    github_url = f"https://github.com/{github_repo_path}.git"
+    prefix = (
+        os.environ.get("LOCAGENT_GITHUB_MIRROR_PREFIX")
+        or os.environ.get("GITHUB_MIRROR_PREFIX")
+        or os.environ.get("REPO_GITHUB_MIRROR_PREFIX")
+        or ""
+    ).strip()
+    if not prefix:
+        return github_url
+    return f"{prefix.rstrip('/')}/{github_url}"
 
 
 def _run_command(args: list[str], cwd: Optional[str] = None) -> str:

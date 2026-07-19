@@ -15,6 +15,7 @@ set -euo pipefail
 # wrappers.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export GITHUB_MIRROR_PREFIX="${GITHUB_MIRROR_PREFIX:-${REPO_GITHUB_MIRROR_PREFIX:-https://gh.xmly.dev}}"
 
 warn() {
   echo "[warn] $*" >&2

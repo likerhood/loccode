@@ -11,6 +11,7 @@ set -euo pipefail
 # Override SOURCE_JSONL / STRUCTURE_DIR if you prepare a different full set.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export GITHUB_MIRROR_PREFIX="${GITHUB_MIRROR_PREFIX:-${REPO_GITHUB_MIRROR_PREFIX:-https://gh.xmly.dev}}"
 
 EXP_NAME="${EXP_NAME:-omnigirl-full-candidates}"
 BENCHMARK="${BENCHMARK:-omnigirl}"

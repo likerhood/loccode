@@ -5,6 +5,7 @@ set -euo pipefail
 # It reuses the full-dev runner, but pins EXP_NAME/SAMPLE_SIZE to the 60 subset.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export GITHUB_MIRROR_PREFIX="${GITHUB_MIRROR_PREFIX:-${REPO_GITHUB_MIRROR_PREFIX:-https://gh.xmly.dev}}"
 
 export EXP_NAME="${EXP_NAME:-swebench_multimodal-60}"
 export SAMPLE_SIZE="${SAMPLE_SIZE:-60}"

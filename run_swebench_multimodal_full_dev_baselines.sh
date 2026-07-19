@@ -34,6 +34,7 @@ set -euo pipefail
 #   FORCE_PREPARE=1 FORCE_STRUCTURES=1 bash run_swebench_multimodal_full_dev_baselines.sh
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export GITHUB_MIRROR_PREFIX="${GITHUB_MIRROR_PREFIX:-${REPO_GITHUB_MIRROR_PREFIX:-https://gh.xmly.dev}}"
 
 EXP_NAME="${EXP_NAME:-swebench_multimodal-full-dev}"
 BENCHMARK="swebench_multimodal"

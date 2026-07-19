@@ -75,8 +75,15 @@ def ensure_local_mirror(repo_name: str, mirror_root: str = MIRROR_ROOT):
     if not os.path.exists(mirror_path):
         os.makedirs(mirror_root, exist_ok=True)
         print(f"[mirror] cloning {repo_name} ...")
+        github_url = f"https://github.com/{repo_name}.git"
+        mirror_prefix = (
+            os.environ.get("GITHUB_MIRROR_PREFIX")
+            or os.environ.get("REPO_GITHUB_MIRROR_PREFIX")
+            or "https://gh.xmly.dev"
+        ).strip()
+        clone_url = f"{mirror_prefix.rstrip('/')}/{github_url}" if mirror_prefix else github_url
         subprocess.run(
-            ["git", "clone", "--mirror", f"https://gh.xmly.dev/https://github.com/{repo_name}.git", mirror_path],
+            ["git", "clone", "--mirror", clone_url, mirror_path],
             check=True,
         )
     else:

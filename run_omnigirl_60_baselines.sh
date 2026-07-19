@@ -8,6 +8,7 @@ set -euo pipefail
 # eval-only recovery, five MM-IR methods, and strict/relaxed metrics.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export GITHUB_MIRROR_PREFIX="${GITHUB_MIRROR_PREFIX:-${REPO_GITHUB_MIRROR_PREFIX:-https://gh.xmly.dev}}"
 
 export EXP_NAME="${EXP_NAME:-omnigirl-unified60}"
 export SAMPLE_SIZE="${SAMPLE_SIZE:-60}"

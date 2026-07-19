@@ -36,7 +36,12 @@ mod.main()
 export OPENAI_API_KEY="${OPENAI_API_KEY:-dummy}"
 export OPENAI_API_BASE="${OPENAI_API_BASE:-http://10.102.65.40:8002/v1}"
 export HF_ENDPOINT="${HF_ENDPOINT:-https://huggingface.co}"
-export GITHUB_URL_PREFIX="${GITHUB_URL_PREFIX:-https://gh.xmly.dev/https://github.com}"
+export GITHUB_MIRROR_PREFIX="${GITHUB_MIRROR_PREFIX:-${REPO_GITHUB_MIRROR_PREFIX:-https://gh.xmly.dev}}"
+if [[ -n "${GITHUB_MIRROR_PREFIX}" ]]; then
+  export GITHUB_URL_PREFIX="${GITHUB_URL_PREFIX:-${GITHUB_MIRROR_PREFIX%/}/https://github.com}"
+else
+  export GITHUB_URL_PREFIX="${GITHUB_URL_PREFIX:-}"
+fi
 export MULADAPTER_MODE="${MULADAPTER_MODE:-codev_compact}"
 export MULADAPTER_DEFAULT_MODE="${MULADAPTER_DEFAULT_MODE:-${MULADAPTER_MODE}}"
 export MULADAPTER_MODEL="${MULADAPTER_MODEL:-qwen3-vl-8b}"

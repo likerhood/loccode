@@ -25,6 +25,9 @@ MMIR_METHODS="${MMIR_METHODS:-bm25-mmir e5-mmir jina-code-v2-mmir codesage-large
 MAX_GOLD="${MAX_GOLD:-15}"
 CLEAN_MODE="${CLEAN_MODE:-three-level}"
 SUFFIX="${SUFFIX:-clean15}"
+CLEAN_EXPECTED_ROWS="${CLEAN_EXPECTED_ROWS:-0}"
+CLEAN_PROGRESS_INTERVAL="${CLEAN_PROGRESS_INTERVAL:-25}"
+USE_EXISTING_CLEAN_SUBSET="${USE_EXISTING_CLEAN_SUBSET:-0}"
 CONDA_ENV_ROOT="${CONDA_ENV_ROOT:-}"
 if [[ -z "${PYTHON_BIN:-}" ]]; then
   if [[ -n "${CONDA_ENV_ROOT}" && -x "${CONDA_ENV_ROOT%/}/locagent/bin/python" ]]; then
@@ -67,6 +70,7 @@ esac
 
 CLEAN_PREFIX="${CLEAN_PREFIX:-${ROOT_DIR}/clean_subsets/${BENCHMARK}.${SUFFIX}}"
 CLEAN_SAMPLES="${CLEAN_PREFIX}.samples.jsonl"
+CLEAN_MANIFEST="${CLEAN_PREFIX}.manifest.json"
 
 truthy() {
   [[ "${1:-}" == "1" || "${1:-}" == "true" || "${1:-}" == "yes" ]]
@@ -76,6 +80,42 @@ run_cmd() {
   echo "+ $*"
   if ! truthy "${DRY_RUN}"; then
     "$@"
+  fi
+}
+
+jsonl_rows() {
+  local path="$1"
+  if [[ -f "${path}" ]]; then
+    wc -l < "${path}" | tr -d ' '
+  else
+    echo 0
+  fi
+}
+
+require_clean_subset_rows() {
+  local rows
+  rows="$(jsonl_rows "${CLEAN_SAMPLES}")"
+  if [[ "${rows}" -le 0 ]]; then
+    echo "ERROR: clean samples missing or empty: ${CLEAN_SAMPLES}" >&2
+    exit 2
+  fi
+  if [[ "${CLEAN_EXPECTED_ROWS}" != "0" && "${rows}" != "${CLEAN_EXPECTED_ROWS}" ]]; then
+    cat >&2 <<EOF
+ERROR: clean subset row count mismatch.
+
+Clean samples:
+  ${CLEAN_SAMPLES}
+
+Found rows:
+  ${rows}
+
+Expected rows:
+  ${CLEAN_EXPECTED_ROWS}
+
+This means the benchmark口径 is not aligned. Use the fixed clean subset file,
+or rebuild/copy the expected version before re-evaluating.
+EOF
+    exit 2
   fi
 }
 
@@ -132,14 +172,29 @@ echo "MM-IR methods: ${MMIR_METHODS}"
 echo "Clean mode:    ${CLEAN_MODE}"
 echo "Max gold:      ${MAX_GOLD}"
 echo "Suffix:        ${SUFFIX}"
+echo "Clean prefix:  ${CLEAN_PREFIX}"
+echo "Use existing:  ${USE_EXISTING_CLEAN_SUBSET}"
+echo "Expected rows: ${CLEAN_EXPECTED_ROWS}"
 
-run_cmd "${PYTHON_BIN}" "${ROOT_DIR}/scripts/build_three_level_clean_subset.py" \
-  --samples "${SAMPLES}" \
-  --structure-dir "${STRUCTURE_DIR}" \
-  --output-prefix "${CLEAN_PREFIX}" \
-  --mode "${CLEAN_MODE}" \
-  --max-gold "${MAX_GOLD}" \
-  --write-diagnostic
+if truthy "${USE_EXISTING_CLEAN_SUBSET}"; then
+  echo "[clean-subset] using existing fixed subset: ${CLEAN_SAMPLES}"
+else
+  run_cmd env PYTHONUNBUFFERED=1 "${PYTHON_BIN}" "${ROOT_DIR}/scripts/build_three_level_clean_subset.py" \
+    --samples "${SAMPLES}" \
+    --structure-dir "${STRUCTURE_DIR}" \
+    --output-prefix "${CLEAN_PREFIX}" \
+    --mode "${CLEAN_MODE}" \
+    --max-gold "${MAX_GOLD}" \
+    --progress-interval "${CLEAN_PROGRESS_INTERVAL}" \
+    --write-diagnostic
+fi
+
+if ! truthy "${DRY_RUN}"; then
+  require_clean_subset_rows
+fi
+
+echo "[clean-subset] rows=$(jsonl_rows "${CLEAN_SAMPLES}")"
+[[ -s "${CLEAN_MANIFEST}" ]] && echo "[clean-subset] manifest=${CLEAN_MANIFEST}"
 
 if has_baseline locagent; then
   reeval_one \

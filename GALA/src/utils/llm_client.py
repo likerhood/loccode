@@ -51,7 +51,7 @@ def _connection_error_retries() -> int:
 
 
 def _connection_error_retry_sleeps() -> list[float]:
-    raw = os.environ.get("LLM_CONNECTION_ERROR_RETRY_SLEEPS", "30,50,60,100")
+    raw = os.environ.get("LLM_CONNECTION_ERROR_RETRY_SLEEPS", "20,30,60,100")
     sleeps: list[float] = []
     for item in raw.split(","):
         item = item.strip()
@@ -241,6 +241,11 @@ def send_chat_completion(
             if is_last_attempt:
                 break
             sleep_for = _connection_error_sleep_for_attempt(attempt)
+            print(
+                f"[GALA][warn] transient LLM request error; retrying "
+                f"{attempt + 1}/{total_attempts - 1} after {sleep_for if sleep_for else retry_delay:.1f}s: {exc}",
+                flush=True,
+            )
             time.sleep(sleep_for if sleep_for else retry_delay)
 
     raise last_error

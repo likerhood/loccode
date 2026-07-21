@@ -197,6 +197,125 @@ else:
 PY
 }
 
+link_gala_repos_from_locagent() {
+  local exp_name="$1"
+  local samples_file="$2"
+  local gala_repo_dir="$3"
+
+  if ! is_truthy "${GALA_REUSE_LOCAGENT_REPOS:-1}"; then
+    echo "[gala-repo-reuse] disabled by GALA_REUSE_LOCAGENT_REPOS=0"
+    return 0
+  fi
+  if [[ ! -s "${samples_file}" ]]; then
+    echo "[gala-repo-reuse] skip: samples file not found: ${samples_file}"
+    return 0
+  fi
+
+  local clean_base="${exp_name%-clean15}"
+  local shared_roots="${GALA_LOCAGENT_SHARED_ROOTS:-}"
+  if [[ -z "${shared_roots}" ]]; then
+    shared_roots="${ROOT_DIR}/LocAgent/repo_newtest_${exp_name}/_shared_worktrees"
+    if [[ "${clean_base}" != "${exp_name}" ]]; then
+      shared_roots="${shared_roots}:${ROOT_DIR}/LocAgent/repo_newtest_${clean_base}/_shared_worktrees"
+    fi
+    shared_roots="${shared_roots}:${ROOT_DIR}/LocAgent/repo_newtest_omnigirl-full-candidates/_shared_worktrees"
+  fi
+
+  echo "[gala-repo-reuse] samples: ${samples_file}"
+  echo "[gala-repo-reuse] GALA repo dir: ${gala_repo_dir}"
+  echo "[gala-repo-reuse] LocAgent shared roots: ${shared_roots}"
+  if is_truthy "${DRY_RUN}"; then
+    echo "[gala-repo-reuse] dry run: no symlinks created"
+    return 0
+  fi
+
+  mkdir -p "${gala_repo_dir}"
+  "${PYTHON:-python3}" - "${samples_file}" "${gala_repo_dir}" "${shared_roots}" "${GALA_REPO_LINK_MODE:-symlink}" <<'PY'
+import json
+import os
+import shutil
+import sys
+from pathlib import Path
+
+samples_file = Path(sys.argv[1])
+gala_repo_dir = Path(sys.argv[2])
+shared_roots = [Path(p) for p in sys.argv[3].split(":") if p]
+link_mode = sys.argv[4].strip().lower()
+
+
+def iter_records(path: Path):
+    text = path.read_text(encoding="utf-8", errors="ignore").strip()
+    if not text:
+        return
+    if path.suffix == ".jsonl":
+        for line in text.splitlines():
+            line = line.strip()
+            if line:
+                yield json.loads(line)
+        return
+    data = json.loads(text)
+    if isinstance(data, dict):
+        yield from (v for v in data.values() if isinstance(v, dict))
+    elif isinstance(data, list):
+        yield from (v for v in data if isinstance(v, dict))
+
+
+repos = sorted({str(row.get("repo") or "").strip() for row in iter_records(samples_file) if row.get("repo")})
+linked = 0
+existing = 0
+missing = []
+
+for repo in repos:
+    owner = repo.split("/", 1)[0]
+    repo_dir_name = repo.replace("/", "_")
+    target = gala_repo_dir / owner
+    if target.exists() or target.is_symlink():
+        if target.is_dir() and not target.is_symlink() and not (target / ".git").exists():
+            try:
+                next(target.iterdir())
+            except StopIteration:
+                target.rmdir()
+            else:
+                print(f"[gala-repo-reuse] keep existing non-git non-empty dir: {target}")
+                existing += 1
+                continue
+        else:
+            existing += 1
+            continue
+    if target.exists() or target.is_symlink():
+        existing += 1
+        continue
+
+    source = None
+    for root in shared_roots:
+        candidate = root / repo_dir_name
+        if candidate.is_dir() and (candidate / ".git").exists():
+            source = candidate
+            break
+    if source is None:
+        missing.append(repo)
+        continue
+
+    if link_mode == "copy":
+        shutil.copytree(source, target, symlinks=True)
+        action = "copied"
+    else:
+        os.symlink(source, target, target_is_directory=True)
+        action = "linked"
+    linked += 1
+    print(f"[gala-repo-reuse] {action}: {target} -> {source}")
+
+print(
+    "[gala-repo-reuse] summary: "
+    f"repos={len(repos)} existing={existing} linked={linked} missing={len(missing)}"
+)
+if missing:
+    print("[gala-repo-reuse] repos still need normal clone: " + ", ".join(missing[:20]))
+    if len(missing) > 20:
+        print(f"[gala-repo-reuse] ... and {len(missing) - 20} more")
+PY
+}
+
 run_if_needed() {
   local label="$1"
   local markers="$2"
@@ -601,6 +720,7 @@ EOF
         --loc-output '${GALA_PRED}' \
         --structure-dir '${STRUCTURE_DIR}'"
   if ! run_eval_if_possible "GALA" "${GALA_RESULT_DIR}" "${GALA_PRED}" "${GALA_EVAL_CMD}"; then
+    link_gala_repos_from_locagent "${EXP_NAME}" "${SOURCE_JSONL}" "${ROOT_DIR}/GALA/mytest/${EXP_NAME}/repos"
     run_if_needed "Run GALA on ${EXP_NAME}" "$(metric_pair "${GALA_RESULT_DIR}")" \
       run_shell "cd '${ROOT_DIR}/GALA' && \
         PYTHON_BIN='${GALA_PY}' \

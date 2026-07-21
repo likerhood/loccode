@@ -233,6 +233,55 @@ run_logged() {
   return "${status}"
 }
 
+run_logged_with_supervisor_retry() {
+  local name="$1"
+  shift
+  local max_attempts="${SUPERVISOR_MAX_ATTEMPTS:-1}"
+  local retry_sleep="${SUPERVISOR_RETRY_SLEEP:-120}"
+  local attempt status log_name
+
+  if ! [[ "${max_attempts}" =~ ^[0-9]+$ ]] || [[ "${max_attempts}" -lt 1 ]]; then
+    echo "ERROR: SUPERVISOR_MAX_ATTEMPTS must be a positive integer." >&2
+    exit 2
+  fi
+  if ! [[ "${retry_sleep}" =~ ^[0-9]+$ ]] || [[ "${retry_sleep}" -lt 0 ]]; then
+    echo "ERROR: SUPERVISOR_RETRY_SLEEP must be a non-negative integer seconds value." >&2
+    exit 2
+  fi
+
+  attempt=1
+  while [[ "${attempt}" -le "${max_attempts}" ]]; do
+    if [[ "${max_attempts}" -gt 1 ]]; then
+      log_name="${name}_attempt${attempt}"
+      echo
+      echo "========== ${name} supervisor attempt ${attempt}/${max_attempts} =========="
+    else
+      log_name="${name}"
+    fi
+
+    set +e
+    run_logged "${log_name}" "$@"
+    status=$?
+    set -e
+
+    if [[ "${status}" == "0" ]]; then
+      if [[ "${max_attempts}" -gt 1 ]]; then
+        echo "[supervisor-retry] ${name} succeeded on attempt ${attempt}/${max_attempts}."
+      fi
+      return 0
+    fi
+
+    if [[ "${attempt}" -ge "${max_attempts}" ]]; then
+      echo "[supervisor-retry] ${name} failed after ${attempt}/${max_attempts} attempt(s); status=${status}." >&2
+      return "${status}"
+    fi
+
+    echo "[supervisor-retry] ${name} failed with status ${status}; sleep ${retry_sleep}s before retry $((attempt + 1))/${max_attempts}." >&2
+    sleep "${retry_sleep}"
+    attempt=$((attempt + 1))
+  done
+}
+
 setup_env() {
   local env_name="$1"
   local -a args=(--env "${env_name}")
@@ -398,6 +447,8 @@ LIVE_LOGS="${LIVE_LOGS:-1}"
 LIVE_LOG_LINES="${LIVE_LOG_LINES:-0}"
 STATUS_INTERVAL="${STATUS_INTERVAL:-${SERVER_HEARTBEAT_INTERVAL}}"
 FAIL_FAST_ON_BASELINE_FAILURE="${FAIL_FAST_ON_BASELINE_FAILURE:-1}"
+SUPERVISOR_MAX_ATTEMPTS="${SUPERVISOR_MAX_ATTEMPTS:-1}"
+SUPERVISOR_RETRY_SLEEP="${SUPERVISOR_RETRY_SLEEP:-120}"
 LOG_DIR="${LOG_DIR:-${ROOT_DIR}/logs/server_swebench_multimodal_full_dev_$(date +%Y%m%d_%H%M%S)}"
 
 FULL_DEV_SAMPLES="${ROOT_DIR}/LocAgent/newtest/${EXP_NAME}/data/samples.jsonl"
@@ -481,6 +532,8 @@ Heartbeat tail lines: ${SERVER_HEARTBEAT_TAIL_LINES}
 Inner live logs: ${LIVE_LOGS}
 Inner status interval: ${STATUS_INTERVAL}s
 Fail fast on baseline failure: ${FAIL_FAST_ON_BASELINE_FAILURE}
+Supervisor max attempts: ${SUPERVISOR_MAX_ATTEMPTS}
+Supervisor retry sleep: ${SUPERVISOR_RETRY_SLEEP}s
 Log dir: ${LOG_DIR}
 EOF
 
@@ -531,7 +584,7 @@ if is_truthy "${PARALLEL}"; then
   RUN_SCRIPT="${ROOT_DIR}/run_swebench_multimodal_full_dev_baselines_parallel.sh"
 fi
 
-run_logged "run_swebench_multimodal_full_dev" \
+run_logged_with_supervisor_retry "run_swebench_multimodal_full_dev" \
   env \
     NO_PROXY="${API_NO_PROXY_VALUE}" \
     no_proxy="${API_NO_PROXY_VALUE}" \

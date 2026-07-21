@@ -73,6 +73,52 @@ run_cmd() {
   fi
 }
 
+run_cmd_with_supervisor_retry() {
+  local label="$1"
+  shift
+  local max_attempts="${SUPERVISOR_MAX_ATTEMPTS:-1}"
+  local retry_sleep="${SUPERVISOR_RETRY_SLEEP:-120}"
+  local attempt status
+
+  if ! [[ "${max_attempts}" =~ ^[0-9]+$ ]] || [[ "${max_attempts}" -lt 1 ]]; then
+    echo "ERROR: SUPERVISOR_MAX_ATTEMPTS must be a positive integer." >&2
+    exit 2
+  fi
+  if ! [[ "${retry_sleep}" =~ ^[0-9]+$ ]] || [[ "${retry_sleep}" -lt 0 ]]; then
+    echo "ERROR: SUPERVISOR_RETRY_SLEEP must be a non-negative integer seconds value." >&2
+    exit 2
+  fi
+
+  attempt=1
+  while [[ "${attempt}" -le "${max_attempts}" ]]; do
+    if [[ "${max_attempts}" -gt 1 ]]; then
+      echo
+      echo "========== ${label} supervisor attempt ${attempt}/${max_attempts} =========="
+    fi
+
+    set +e
+    run_cmd "$@"
+    status=$?
+    set -e
+
+    if [[ "${status}" == "0" ]]; then
+      if [[ "${max_attempts}" -gt 1 ]]; then
+        echo "[supervisor-retry] ${label} succeeded on attempt ${attempt}/${max_attempts}."
+      fi
+      return 0
+    fi
+
+    if [[ "${attempt}" -ge "${max_attempts}" ]]; then
+      echo "[supervisor-retry] ${label} failed after ${attempt}/${max_attempts} attempt(s); status=${status}." >&2
+      return "${status}"
+    fi
+
+    echo "[supervisor-retry] ${label} failed with status ${status}; sleep ${retry_sleep}s before retry $((attempt + 1))/${max_attempts}." >&2
+    sleep "${retry_sleep}"
+    attempt=$((attempt + 1))
+  done
+}
+
 if [[ ! -f "${FULL_RUNNER}" ]]; then
   echo "ERROR: missing full runner: ${FULL_RUNNER}" >&2
   exit 2
@@ -104,6 +150,8 @@ DRY_RUN="${DRY_RUN:-0}"
 BASELINES="${BASELINES:-locagent cosil graphlocator gala mmir}"
 BASELINE_ENVS="${BASELINE_ENVS:-${BASELINES}}"
 CLEAN_PROGRESS_INTERVAL="${CLEAN_PROGRESS_INTERVAL:-25}"
+SUPERVISOR_MAX_ATTEMPTS="${SUPERVISOR_MAX_ATTEMPTS:-1}"
+SUPERVISOR_RETRY_SLEEP="${SUPERVISOR_RETRY_SLEEP:-120}"
 
 PYTHON_BIN_RESOLVED="$(detect_python_bin)"
 
@@ -125,6 +173,8 @@ Python for Clean15 builder: ${PYTHON_BIN_RESOLVED}
 Prepare full inputs: ${PREPARE_FULL_INPUTS}
 Force clean subset: ${FORCE_CLEAN_SUBSET}
 Clean progress interval: ${CLEAN_PROGRESS_INTERVAL}
+Supervisor max attempts: ${SUPERVISOR_MAX_ATTEMPTS}
+Supervisor retry sleep: ${SUPERVISOR_RETRY_SLEEP}s
 Dry run: ${DRY_RUN}
 EOF
 
@@ -213,7 +263,7 @@ fi
 
 echo
 echo "========== Run OmniGIRL Clean15 baselines =========="
-run_cmd env \
+run_cmd_with_supervisor_retry "run_omnigirl_clean15" env \
   EXP_NAME="${CLEAN_EXP_NAME}" \
   EXPECTED_SAMPLES="${clean_sample_count}" \
   SOURCE_JSONL="${CLEAN_SOURCE_JSONL}" \

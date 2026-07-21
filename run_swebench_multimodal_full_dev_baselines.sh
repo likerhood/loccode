@@ -228,6 +228,158 @@ expected_sample_rows_ready() {
   fi
 }
 
+link_gala_repos_from_locagent() {
+  local exp_name="$1"
+  local samples_file="$2"
+  local gala_repo_dir="$3"
+
+  if ! is_truthy "${GALA_REUSE_LOCAGENT_REPOS:-1}"; then
+    echo "[gala-repo-reuse] disabled by GALA_REUSE_LOCAGENT_REPOS=0"
+    return 0
+  fi
+  if [[ ! -s "${samples_file}" ]]; then
+    echo "[gala-repo-reuse] skip: samples file not found: ${samples_file}"
+    return 0
+  fi
+
+  local shared_roots="${GALA_LOCAGENT_SHARED_ROOTS:-}"
+  if [[ -z "${shared_roots}" ]]; then
+    shared_roots="${ROOT_DIR}/LocAgent/repo_newtest_${exp_name}/_shared_worktrees"
+    shared_roots="${shared_roots}:${ROOT_DIR}/LocAgent/repo_newtest_swebench_multimodal-full-dev/_shared_worktrees"
+  fi
+
+  echo "[gala-repo-reuse] samples: ${samples_file}"
+  echo "[gala-repo-reuse] GALA repo dir: ${gala_repo_dir}"
+  echo "[gala-repo-reuse] LocAgent shared roots: ${shared_roots}"
+  if is_truthy "${DRY_RUN}"; then
+    echo "[gala-repo-reuse] dry run: no symlinks created"
+    return 0
+  fi
+
+  mkdir -p "${gala_repo_dir}"
+  "${PYTHON:-python3}" - "${samples_file}" "${gala_repo_dir}" "${shared_roots}" "${GALA_REPO_LINK_MODE:-symlink}" <<'PY'
+import json
+import os
+import shutil
+import sys
+from pathlib import Path
+
+samples_file = Path(sys.argv[1])
+gala_repo_dir = Path(sys.argv[2])
+shared_roots = [Path(p) for p in sys.argv[3].split(":") if p]
+link_mode = sys.argv[4].strip().lower()
+
+
+def iter_records(path: Path):
+    text = path.read_text(encoding="utf-8", errors="ignore").strip()
+    if not text:
+        return
+    if path.suffix == ".jsonl":
+        for line in text.splitlines():
+            line = line.strip()
+            if line:
+                yield json.loads(line)
+        return
+    data = json.loads(text)
+    if isinstance(data, dict):
+        yield from (v for v in data.values() if isinstance(v, dict))
+    elif isinstance(data, list):
+        yield from (v for v in data if isinstance(v, dict))
+
+
+repos = sorted({str(row.get("repo") or "").strip() for row in iter_records(samples_file) if row.get("repo")})
+linked = 0
+existing = 0
+missing = []
+
+for repo in repos:
+    owner = repo.split("/", 1)[0]
+    repo_dir_name = repo.replace("/", "_")
+    target = gala_repo_dir / owner
+    if target.exists() or target.is_symlink():
+        if target.is_dir() and not target.is_symlink() and not (target / ".git").exists():
+            try:
+                next(target.iterdir())
+            except StopIteration:
+                target.rmdir()
+            else:
+                print(f"[gala-repo-reuse] keep existing non-git non-empty dir: {target}")
+                existing += 1
+                continue
+        else:
+            existing += 1
+            continue
+    if target.exists() or target.is_symlink():
+        existing += 1
+        continue
+
+    source = None
+    for root in shared_roots:
+        candidate = root / repo_dir_name
+        if candidate.is_dir() and (candidate / ".git").exists():
+            source = candidate
+            break
+    if source is None:
+        missing.append(repo)
+        continue
+
+    if link_mode == "copy":
+        shutil.copytree(source, target, symlinks=True)
+        action = "copied"
+    else:
+        os.symlink(source, target, target_is_directory=True)
+        action = "linked"
+    linked += 1
+    print(f"[gala-repo-reuse] {action}: {target} -> {source}")
+
+print(
+    "[gala-repo-reuse] summary: "
+    f"repos={len(repos)} existing={existing} linked={linked} missing={len(missing)}"
+)
+if missing:
+    print("[gala-repo-reuse] repos still need normal clone: " + ", ".join(missing[:20]))
+    if len(missing) > 20:
+        print(f"[gala-repo-reuse] ... and {len(missing) - 20} more")
+PY
+}
+
+print_shared_input_state() {
+  local samples structures
+  samples="$(sample_rows)"
+  structures="$(structure_rows)"
+  echo "[state] EXP_NAME=${EXP_NAME}"
+  echo "[state] SAMPLE_SIZE=${SAMPLE_SIZE}"
+  echo "[state] FORCE_PREPARE=${FORCE_PREPARE}"
+  echo "[state] FORCE_STRUCTURES=${FORCE_STRUCTURES}"
+  echo "[state] SKIP_SHARED_PREPARE=${SKIP_SHARED_PREPARE}"
+  echo "[state] CANONICAL_SAMPLES=${CANONICAL_SAMPLES}"
+  echo "[state] sample_rows=${samples}"
+  echo "[state] CANONICAL_STRUCTURE_DIR=${CANONICAL_STRUCTURE_DIR}"
+  echo "[state] structure_rows=${structures}"
+}
+
+explain_prepare_decision() {
+  local samples
+  samples="$(sample_rows)"
+  if is_truthy "${FORCE_PREPARE}"; then
+    echo "[prepare reason] FORCE_PREPARE=${FORCE_PREPARE}"
+    return 0
+  fi
+  if [[ ! -f "${CANONICAL_SAMPLES}" ]]; then
+    echo "[prepare reason] canonical samples file is missing: ${CANONICAL_SAMPLES}"
+    return 0
+  fi
+  if [[ "${SAMPLE_SIZE}" -gt 0 && "${samples}" != "${SAMPLE_SIZE}" ]]; then
+    echo "[prepare reason] sample row count mismatch: rows=${samples}, expected=${SAMPLE_SIZE}"
+    return 0
+  fi
+  if [[ "${SAMPLE_SIZE}" -le 0 && "${samples}" == "0" ]]; then
+    echo "[prepare reason] SAMPLE_SIZE<=0 and sample rows are 0"
+    return 0
+  fi
+  echo "[prepare reason] unknown; expected_sample_rows_ready returned false"
+}
+
 structure_rows() {
   if [[ -d "${CANONICAL_STRUCTURE_DIR}" ]]; then
     find "${CANONICAL_STRUCTURE_DIR}" -maxdepth 1 -type f -name '*.json' | wc -l | tr -d ' '
@@ -504,6 +656,8 @@ Skip shared prepare: ${SKIP_SHARED_PREPARE}
 Dry run: ${DRY_RUN}
 EOF
 
+print_shared_input_state
+
 api_preflight_if_needed
 
 PREPARE_ARGS=(
@@ -533,6 +687,7 @@ elif ! is_truthy "${FORCE_PREPARE}" && expected_sample_rows_ready; then
   echo "[skip] Found ${CANONICAL_SAMPLES} with $(sample_rows) rows."
   echo "[skip] Use FORCE_PREPARE=1 to regenerate canonical samples."
 else
+  explain_prepare_decision
   run_step "Prepare canonical SWE-bench Multimodal dev" \
     run_shell "cd '${ROOT_DIR}/LocAgent' && OPENAI_API_BASE='${OPENAI_API_BASE}' OPENAI_API_KEY='${OPENAI_API_KEY}' '${LOCAGENT_PY}' ${PREPARE_ARGS[*]}"
 fi
@@ -545,6 +700,11 @@ elif ! is_truthy "${FORCE_STRUCTURES}" && [[ "$(structure_rows)" -ge "$(sample_r
   echo "[skip] Found $(structure_rows) structure files for $(sample_rows) samples."
   echo "[skip] Use FORCE_STRUCTURES=1 to rebuild canonical structures."
 else
+  if is_truthy "${FORCE_STRUCTURES}"; then
+    echo "[structure reason] FORCE_STRUCTURES=${FORCE_STRUCTURES}"
+  else
+    echo "[structure reason] structure count insufficient: structures=$(structure_rows), samples=$(sample_rows)"
+  fi
   run_step "Build canonical repo_structures" \
     run_shell "cd '${ROOT_DIR}/LocAgent' && '${LOCAGENT_PY}' newtest/scripts/build_repo_structures.py \
       --samples '${CANONICAL_SAMPLES}' \
@@ -719,6 +879,7 @@ EOF
         --loc-output '${GALA_PRED}' \
         --structure-dir '${CANONICAL_STRUCTURE_DIR}'"
   if ! run_eval_if_possible "GALA" "${GALA_RESULT_DIR}" "${GALA_PRED}" "${GALA_EVAL_CMD}"; then
+    link_gala_repos_from_locagent "${EXP_NAME}" "${CANONICAL_SAMPLES}" "${ROOT_DIR}/GALA/mytest/${EXP_NAME}/repos"
     run_if_needed "Run GALA on ${EXP_NAME}" "$(metric_pair "${GALA_RESULT_DIR}")" \
       run_shell "cd '${ROOT_DIR}/GALA' && \
       PYTHON_BIN='${GALA_PY}' \

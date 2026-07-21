@@ -263,11 +263,13 @@ while [[ "${#PIDS[@]}" -gt 0 ]]; do
   compact_jobs
   if [[ "${FAILED}" != "0" ]] && is_truthy "${FAIL_FAST_ON_BASELINE_FAILURE}"; then
     terminate_active_jobs
+    cleanup_tails
     break
   fi
   print_running_status
 done
 
+cleanup_tails
 echo
 echo "Logs: ${LOG_DIR}"
 if [[ "${FAILED}" == "0" ]]; then

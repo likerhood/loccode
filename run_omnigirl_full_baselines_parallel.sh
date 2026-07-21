@@ -72,11 +72,26 @@ declare -A PID_TO_NAME=()
 declare -A PID_TO_STATUS_FILE=()
 FAILED=0
 
+kill_process_tree() {
+  local pid="$1"
+  local child
+  if [[ -z "${pid:-}" ]]; then
+    return 0
+  fi
+  while read -r child; do
+    [[ -n "${child}" ]] || continue
+    kill_process_tree "${child}"
+  done < <(pgrep -P "${pid}" 2>/dev/null || true)
+  kill "${pid}" >/dev/null 2>&1 || true
+}
+
 cleanup_tails() {
   local tail_pid
   for tail_pid in "${TAIL_PIDS[@]}"; do
-    kill "${tail_pid}" >/dev/null 2>&1 || true
+    kill_process_tree "${tail_pid}"
+    wait "${tail_pid}" >/dev/null 2>&1 || true
   done
+  TAIL_PIDS=()
 }
 
 terminate_active_jobs() {
@@ -85,7 +100,8 @@ terminate_active_jobs() {
     if [[ ! -f "${PID_TO_STATUS_FILE[${pid}]}" ]]; then
       name="${PID_TO_NAME[${pid}]:-${pid}}"
       echo "[stop] terminating active baseline job ${name} pid=${pid}" >&2
-      kill "${pid}" >/dev/null 2>&1 || true
+      kill_process_tree "${pid}"
+      wait "${pid}" >/dev/null 2>&1 || true
     fi
   done
 }

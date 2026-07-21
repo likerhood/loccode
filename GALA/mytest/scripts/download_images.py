@@ -7,10 +7,12 @@ import argparse
 import json
 import os
 import shutil
+import time
 from pathlib import Path
 from urllib.parse import urlparse
 
 import requests
+from PIL import Image, ImageFile, UnidentifiedImageError
 
 from mytest_utils import parse_image_assets, write_json
 
@@ -29,7 +31,53 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--image-dir", required=True)
     parser.add_argument("--failures-file", default="")
     parser.add_argument("--timeout", type=int, default=30)
+    parser.add_argument("--retries", type=int, default=int(os.getenv("IMAGE_DOWNLOAD_RETRIES", "3")))
+    parser.add_argument("--retry-sleep", type=float, default=float(os.getenv("IMAGE_DOWNLOAD_RETRY_SLEEP", "10")))
+    parser.add_argument("--backoff", type=float, default=float(os.getenv("IMAGE_DOWNLOAD_BACKOFF", "2")))
     return parser.parse_args()
+
+
+def validate_image_file(path: Path) -> None:
+    if not path.exists() or path.stat().st_size <= 0:
+        raise ValueError("downloaded image is empty")
+    if path.suffix.lower() == ".svg":
+        text = path.read_text(encoding="utf-8", errors="ignore").lstrip()[:200].lower()
+        if "<svg" not in text:
+            raise ValueError("downloaded svg does not look like svg")
+        return
+
+    original_flag = ImageFile.LOAD_TRUNCATED_IMAGES
+    try:
+        try:
+            with Image.open(path) as image:
+                image.verify()
+        except UnidentifiedImageError:
+            ImageFile.LOAD_TRUNCATED_IMAGES = True
+            with Image.open(path) as image:
+                image.load()
+    finally:
+        ImageFile.LOAD_TRUNCATED_IMAGES = original_flag
+
+
+def download_or_copy(image_ref: str, target: Path, timeout: int) -> None:
+    parsed = urlparse(image_ref)
+    if parsed.scheme in {"http", "https"}:
+        response = requests.get(
+            image_ref,
+            timeout=timeout,
+            headers={"User-Agent": "Mozilla/5.0 GALA-image-downloader"},
+        )
+        response.raise_for_status()
+        content_type = response.headers.get("content-type", "").lower()
+        if "text/html" in content_type:
+            raise ValueError(f"unexpected html response content-type={content_type}")
+        target.write_bytes(response.content)
+    else:
+        source = Path(image_ref)
+        if not source.exists():
+            raise FileNotFoundError(str(source))
+        shutil.copyfile(source, target)
+    validate_image_file(target)
 
 
 def main() -> None:
@@ -50,20 +98,29 @@ def main() -> None:
             if target.exists() and target.stat().st_size > 0:
                 success += 1
                 continue
-            parsed = urlparse(image_ref)
-            try:
-                if parsed.scheme in {"http", "https"}:
-                    response = requests.get(image_ref, timeout=args.timeout)
-                    response.raise_for_status()
-                    target.write_bytes(response.content)
-                else:
-                    source = Path(image_ref)
-                    if not source.exists():
-                        raise FileNotFoundError(str(source))
-                    shutil.copyfile(source, target)
-                success += 1
-            except Exception as exc:
-                failures.append({"instance_id": instance_id, "image": image_ref, "error": str(exc)})
+            last_error = ""
+            for attempt in range(1, max(args.retries, 1) + 1):
+                try:
+                    download_or_copy(image_ref, target, timeout=args.timeout)
+                    success += 1
+                    last_error = ""
+                    break
+                except Exception as exc:
+                    last_error = str(exc)
+                    if target.exists():
+                        try:
+                            target.unlink()
+                        except OSError:
+                            pass
+                    if attempt < max(args.retries, 1):
+                        sleep_s = args.retry_sleep * (args.backoff ** (attempt - 1))
+                        print(
+                            f"[download_images][warn] {instance_id} image retry "
+                            f"{attempt}/{args.retries} after {sleep_s:.1f}s: {last_error}"
+                        )
+                        time.sleep(sleep_s)
+            if last_error:
+                failures.append({"instance_id": instance_id, "image": image_ref, "error": last_error})
 
     failures_file = args.failures_file or str(image_dir.parent / "data" / "image_download_failures.json")
     write_json(failures_file, failures)
@@ -74,4 +131,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

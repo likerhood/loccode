@@ -354,6 +354,7 @@ def main():
         cmd_parser.add_argument("--result_path", required=True, help='Path to result data')
         cmd_parser.add_argument("--output_dir", required=True, help='Output directory')
         cmd_parser.add_argument("--max_workers", type=int, default=4, help='Max workers')
+        cmd_parser.add_argument("--resume_existing", action="store_true", help="Reuse existing image IR graphs and process only missing local images")
 
     # generate-image-graph command
     gen_graph_parser = subparsers.add_parser('generate-image-graph', help='Generate image graph')
@@ -464,7 +465,14 @@ def main():
         step_start_ts = time.time()
         usage_before = get_usage_totals()
         image_ir = GenerateIR(args.model_name, args.base_url)
-        image_ir.process_batch(args.result_path, args.input_data, args.output_dir, args.image_dir, max_workers=args.max_workers)
+        image_ir.process_batch(
+            args.result_path,
+            args.input_data,
+            args.output_dir,
+            args.image_dir,
+            max_workers=args.max_workers,
+            resume_existing=args.resume_existing,
+        )
         print(f"Image graph generated: {os.path.join(args.output_dir, 'image_ir_data.json')}")
         _record_step_metrics(timing_records, args.cmd, step_start_ts, time.time(), usage_before, get_usage_totals())
     
@@ -628,5 +636,4 @@ def main():
 if __name__ == "__main__":
     # Main execution code
     sys.exit(main())
-
 

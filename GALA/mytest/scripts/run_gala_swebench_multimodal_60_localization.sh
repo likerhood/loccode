@@ -36,6 +36,10 @@ MAX_WORKERS="${MAX_WORKERS:-1}"
 CLONE_REPOS="${CLONE_REPOS:-1}"
 DOWNLOAD_IMAGES="${DOWNLOAD_IMAGES:-1}"
 RUN_IMAGE_IR="${RUN_IMAGE_IR:-1}"
+REUSE_IMAGE_IR="${REUSE_IMAGE_IR:-1}"
+RESUME_IMAGE_IR="${RESUME_IMAGE_IR:-1}"
+FORCE_IMAGE_IR="${FORCE_IMAGE_IR:-0}"
+CHECK_IMAGE_IR_COMPLETE="${CHECK_IMAGE_IR_COMPLETE:-1}"
 RUN_BUILD_CODE_GRAPH="${RUN_BUILD_CODE_GRAPH:-1}"
 RUN_ALIGN_CODE_GRAPH="${RUN_ALIGN_CODE_GRAPH:-1}"
 FORCE_REBUILD="${FORCE_REBUILD:-0}"
@@ -60,7 +64,7 @@ MODEL_TAG="${VLM_MODEL//\//_}"
 TEST_NAME="${TEST_NAME:-swebench-multimodal-60}"
 TEST_ROOT="${MYTEST_ROOT}/${TEST_NAME}"
 DATA_DIR="${TEST_ROOT}/data"
-IMAGE_DIR="${TEST_ROOT}/images"
+IMAGE_DIR="${IMAGE_DIR:-${TEST_ROOT}/images}"
 REPO_DIR="${TEST_ROOT}/repos"
 RESULT_DIR="${TEST_ROOT}/results/${MODEL_TAG}"
 EVAL_DIR="${RESULT_DIR}/eval"
@@ -99,21 +103,48 @@ if [[ "${DOWNLOAD_IMAGES}" == "1" ]]; then
   "${PYTHON_BIN}" "${SCRIPT_DIR}/download_images.py" \
     --input-data "${DATA_DIR}/samples.json" \
     --image-dir "${IMAGE_DIR}" \
-    --failures-file "${DATA_DIR}/image_download_failures.json"
+    --failures-file "${DATA_DIR}/image_download_failures.json" \
+    --retries "${IMAGE_DOWNLOAD_RETRIES:-3}" \
+    --retry-sleep "${IMAGE_DOWNLOAD_RETRY_SLEEP:-10}" \
+    --backoff "${IMAGE_DOWNLOAD_BACKOFF:-2}"
 else
   echo "[3/6] Skip image download"
 fi
 
 if [[ "${RUN_IMAGE_IR}" == "1" ]]; then
-  echo "[4/6] Generate image IR"
-  "${PYTHON_BIN}" main.py generate-image-ir \
-    --input_data "${DATA_DIR}/samples.json" \
-    --output_dir "${RESULT_DIR}" \
-    --image_dir "${IMAGE_DIR}" \
-    --result_path "${RESULT_DIR}" \
-    --model_name "${VLM_MODEL}" \
-    --base_url "${VLM_BASE_URL}" \
-    --max_workers "${MAX_WORKERS}"
+  echo "[4/6] Check image IR completeness"
+  IMAGE_IR_PATH="${RESULT_DIR}/image_ir_data.json"
+  IMAGE_IR_REPORT="${RESULT_DIR}/image_ir_completeness.json"
+  if [[ "${FORCE_IMAGE_IR}" != "1" && "${REUSE_IMAGE_IR}" == "1" && "${CHECK_IMAGE_IR_COMPLETE}" == "1" ]] && \
+    "${PYTHON_BIN}" "${SCRIPT_DIR}/check_image_ir_complete.py" \
+      --samples "${DATA_DIR}/samples.json" \
+      --image-dir "${IMAGE_DIR}" \
+      --image-ir "${IMAGE_IR_PATH}" \
+      --report "${IMAGE_IR_REPORT}"; then
+    echo "[4/6] Reuse complete image IR: ${IMAGE_IR_PATH}"
+  else
+    echo "[4/6] Generate/resume image IR"
+    IR_ARGS=(
+      --input_data "${DATA_DIR}/samples.json"
+      --output_dir "${RESULT_DIR}"
+      --image_dir "${IMAGE_DIR}"
+      --result_path "${RESULT_DIR}"
+      --model_name "${VLM_MODEL}"
+      --base_url "${VLM_BASE_URL}"
+      --max_workers "${MAX_WORKERS}"
+    )
+    if [[ "${RESUME_IMAGE_IR}" == "1" && "${FORCE_IMAGE_IR}" != "1" ]]; then
+      IR_ARGS+=(--resume_existing)
+    fi
+    "${PYTHON_BIN}" main.py generate-image-ir "${IR_ARGS[@]}"
+    if [[ "${CHECK_IMAGE_IR_COMPLETE}" == "1" ]]; then
+      "${PYTHON_BIN}" "${SCRIPT_DIR}/check_image_ir_complete.py" \
+        --samples "${DATA_DIR}/samples.json" \
+        --image-dir "${IMAGE_DIR}" \
+        --image-ir "${IMAGE_IR_PATH}" \
+        --report "${IMAGE_IR_REPORT}"
+    fi
+  fi
 else
   echo "[4/6] Skip image IR generation"
 fi

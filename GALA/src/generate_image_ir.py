@@ -41,13 +41,34 @@ def _open_image_with_fallback(image_path: str) -> Image.Image:
             ImageFile.LOAD_TRUNCATED_IMAGES = original_flag
 
 
+def _is_processable_image_path(image_path: str, allow_svg: bool = False) -> Tuple[bool, str]:
+    if not os.path.exists(image_path):
+        return False, "missing"
+    if os.path.getsize(image_path) <= 0:
+        return False, "empty"
+
+    if image_path.lower().endswith(".svg"):
+        return (True, "svg-allowed") if allow_svg else (False, "svg-skipped")
+
+    try:
+        image = _open_image_with_fallback(image_path)
+        image.close()
+        return True, "ok"
+    except Exception as exc:
+        return False, f"unreadable:{exc}"
+
+
 def process_image_url_to_base64(img_url: str, image_dir: str = "", instance_id: str = "") -> Optional[str]:
     """Process image URL/local path and return a data URL. Return None if local file does not exist."""
     try:
         img_path = resolve_local_image_path(img_url, image_dir=image_dir, instance_id=instance_id)
 
-        if not os.path.exists(img_path):
-            print(f"Local file does not exist, skipping: {img_path}")
+        processable, reason = _is_processable_image_path(
+            img_path,
+            allow_svg=os.getenv("GALA_ALLOW_SVG_IMAGE_IR", "0") == "1",
+        )
+        if not processable:
+            print(f"Local image is not processable, skipping: {img_path} ({reason})")
             return None
 
         is_gif = img_path.lower().endswith(".gif") or "gif" in img_path.lower()
@@ -105,28 +126,63 @@ class GenerateIR:
             image_path=image_path,
         )
 
-    def _process_image_graph_batch(self, input_data: str, output_dir: str, image_dir: str, max_workers: int) -> None:
+    def _process_image_graph_batch(
+        self,
+        input_data: str,
+        output_dir: str,
+        image_dir: str,
+        max_workers: int,
+        resume_existing: bool = False,
+    ) -> None:
         with open(input_data, "r", encoding="utf-8") as infile:
             all_data = json.load(infile)
 
+        output_path = os.path.join(output_dir, "image_ir_data.json")
+        existing_data: Dict[str, Any] = {}
+        if resume_existing and os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+            try:
+                with open(output_path, "r", encoding="utf-8") as infile:
+                    loaded_existing = json.load(infile)
+                if isinstance(loaded_existing, dict):
+                    existing_data = loaded_existing
+                    print(f"Resume image IR from existing file: {output_path}")
+            except Exception as exc:
+                print(f"Cannot load existing image IR for resume; rebuilding missing graphs: {exc}")
+
         tasks: List[Tuple[str, int, str, str, str]] = []
         skipped_count = 0
+        resumed_count = 0
         for problem_id, data in all_data.items():
             image_list = _safe_parse_image_assets(data)
+            existing_graphs = existing_data.get(problem_id, {}).get("image_graphs", [])
+            existing_count = len(existing_graphs) if isinstance(existing_graphs, list) else 0
+            processable_seen = 0
             for image_idx, img_url in enumerate(image_list):
                 image_path = resolve_local_image_path(img_url, image_dir=image_dir, instance_id=problem_id)
                 img_str = process_image_url_to_base64(img_url, image_dir=image_dir, instance_id=problem_id)
                 if img_str is None:
                     skipped_count += 1
                     continue
+                if resume_existing and processable_seen < existing_count:
+                    processable_seen += 1
+                    resumed_count += 1
+                    continue
+                processable_seen += 1
                 issue_text = str(data.get("problem_statement") or "")
                 tasks.append((problem_id, image_idx, img_str, image_path, issue_text))
 
         if skipped_count > 0:
-            print(f"Skipped {skipped_count} non-existent image files")
+            print(f"Skipped {skipped_count} non-processable image files")
+        if resumed_count > 0:
+            print(f"Reused {resumed_count} existing image graphs")
         print(f"Total images to process: {len(tasks)}")
 
         temp_results: Dict[str, List[Tuple[int, Any]]] = {}
+        if resume_existing:
+            for problem_id, existing_doc in existing_data.items():
+                existing_graphs = existing_doc.get("image_graphs", []) if isinstance(existing_doc, dict) else []
+                if isinstance(existing_graphs, list):
+                    temp_results[problem_id] = list(enumerate(existing_graphs))
 
         def process_single_image(task: Tuple[str, int, str, str, str]) -> Tuple[str, int, Any]:
             problem_id, image_idx, img_str, image_path, issue_text = task
@@ -164,8 +220,10 @@ class GenerateIR:
             doc.pop("sub_graph_caption", None)
             res_dict[problem_id] = doc
 
-        with open(os.path.join(output_dir, "image_ir_data.json"), "w", encoding="utf-8") as outf:
+        temp_output_path = output_path + ".tmp"
+        with open(temp_output_path, "w", encoding="utf-8") as outf:
             outf.write(json.dumps(res_dict, indent=4, ensure_ascii=False))
+        os.replace(temp_output_path, output_path)
 
     def process_batch(
         self,
@@ -174,6 +232,7 @@ class GenerateIR:
         output_dir: str,
         image_dir: str,
         max_workers: int = 4,
+        resume_existing: bool = False,
     ) -> None:
         _ = result_path  # Kept for API compatibility; output is always written to output_dir.
         os.makedirs(output_dir, exist_ok=True)
@@ -190,6 +249,7 @@ class GenerateIR:
             output_dir=output_dir,
             image_dir=image_dir,
             max_workers=max_workers,
+            resume_existing=resume_existing,
         )
 
 
@@ -202,6 +262,7 @@ def main():
     parser.add_argument("--base_url", required=True, help="Base URL for API")
     parser.add_argument("--result_path")
     parser.add_argument("--max_workers", type=int, default=4, help="Max workers")
+    parser.add_argument("--resume_existing", action="store_true", help="Reuse existing image graphs and only process missing local images")
     args = parser.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)
@@ -212,6 +273,7 @@ def main():
         args.output_dir,
         args.image_dir,
         max_workers=args.max_workers,
+        resume_existing=args.resume_existing,
     )
 
 

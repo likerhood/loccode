@@ -33,6 +33,7 @@ RERUN_EMPTY_LOCATION="${RERUN_EMPTY_LOCATION:-0}"
 MAX_ATTEMPT_NUM="${MAX_ATTEMPT_NUM:-1}"
 BUILD_STRUCTURES="${BUILD_STRUCTURES:-1}"
 REBUILD_STRUCTURES="${REBUILD_STRUCTURES:-0}"
+FORCE_PREPARE="${FORCE_PREPARE:-0}"
 
 TEST_ROOT="${REPO_ROOT}/newtest/${TEST_NAME}"
 DATA_DIR="${TEST_ROOT}/data"
@@ -70,22 +71,50 @@ export LOCAGENT_BACKEND_MODEL="${LOCAGENT_BACKEND_MODEL:-${MODEL}}"
 echo "LocAgent internal model: ${LOCAGENT_MODEL}"
 echo "LocAgent backend model: ${LOCAGENT_BACKEND_MODEL}"
 
-echo "[1/3] Prepare ${BENCHMARK} ${SAMPLE_SIZE}-sample data -> ${TEST_NAME}"
-PREPARE_ARGS=(
-  newtest/scripts/prepare_multimodal_localization.py
-  --benchmark "${BENCHMARK}"
-  --sample-size "${SAMPLE_SIZE}"
-  --seed "${SEED}"
-  --output-dir "${DATA_DIR}"
-  --used-list-name "${USED_LIST}"
-)
-if [[ -n "${SOURCE_JSONL}" ]]; then
-  PREPARE_ARGS+=(--source-jsonl "${SOURCE_JSONL}")
+count_jsonl_rows() {
+  local path="$1"
+  if [[ -f "${path}" ]]; then
+    wc -l < "${path}" | tr -d '[:space:]'
+  else
+    printf '0'
+  fi
+}
+
+locagent_prepare_cache_ready() {
+  local samples_jsonl="${DATA_DIR}/samples.jsonl"
+  local samples_json="${DATA_DIR}/samples.json"
+  local config_newtest="${DATA_DIR}/config.newtest.toml"
+  local rows
+  rows="$(count_jsonl_rows "${samples_jsonl}")"
+
+  [[ "${FORCE_PREPARE}" != "1" && "${FORCE_PREPARE}" != "true" ]] || return 1
+  [[ -s "${samples_jsonl}" ]] || return 1
+  [[ -s "${samples_json}" ]] || return 1
+  [[ -s "${config_newtest}" ]] || return 1
+  [[ "${rows}" == "${SAMPLE_SIZE}" ]] || return 1
+}
+
+if locagent_prepare_cache_ready; then
+  echo "[1/3] Skip LocAgent prepare; cached data ready: ${DATA_DIR}/samples.jsonl ($(count_jsonl_rows "${DATA_DIR}/samples.jsonl") rows)"
+  echo "[1/3] Set FORCE_PREPARE=1 to rebuild LocAgent prepared data."
+else
+  echo "[1/3] Prepare ${BENCHMARK} ${SAMPLE_SIZE}-sample data -> ${TEST_NAME}"
+  PREPARE_ARGS=(
+    newtest/scripts/prepare_multimodal_localization.py
+    --benchmark "${BENCHMARK}"
+    --sample-size "${SAMPLE_SIZE}"
+    --seed "${SEED}"
+    --output-dir "${DATA_DIR}"
+    --used-list-name "${USED_LIST}"
+  )
+  if [[ -n "${SOURCE_JSONL}" ]]; then
+    PREPARE_ARGS+=(--source-jsonl "${SOURCE_JSONL}")
+  fi
+  if [[ "${ALLOW_TEXT_ONLY}" == "1" || "${ALLOW_TEXT_ONLY}" == "true" ]]; then
+    PREPARE_ARGS+=(--allow-text-only)
+  fi
+  "${PYTHON_BIN}" "${PREPARE_ARGS[@]}"
 fi
-if [[ "${ALLOW_TEXT_ONLY}" == "1" || "${ALLOW_TEXT_ONLY}" == "true" ]]; then
-  PREPARE_ARGS+=(--allow-text-only)
-fi
-"${PYTHON_BIN}" "${PREPARE_ARGS[@]}"
 
 CONFIG_FILE="config.toml"
 CONFIG_BACKUP=""

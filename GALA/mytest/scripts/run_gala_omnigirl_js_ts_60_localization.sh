@@ -26,6 +26,8 @@ VLM_MODEL="${VLM_MODEL:-qwen3-vl-8b}"
 VLM_BASE_URL="${VLM_BASE_URL:-http://10.102.65.40:8002/v1}"
 TEXT_MODEL_NAME="${TEXT_MODEL_NAME:-${VLM_MODEL}}"
 TEXT_BASE_URL="${TEXT_BASE_URL:-${VLM_BASE_URL}}"
+VLM_API_MODEL_NAME="${VLM_API_MODEL_NAME:-${VLM_MODEL}}"
+TEXT_API_MODEL_NAME="${TEXT_API_MODEL_NAME:-${TEXT_MODEL_NAME}}"
 
 DATASET="${DATASET:-Deep-Software-Analytics/OmniGIRL}"
 SPLIT="${SPLIT:-test}"
@@ -137,7 +139,7 @@ if [[ "${RUN_IMAGE_IR}" == "1" ]]; then
       --output_dir "${RESULT_DIR}"
       --image_dir "${IMAGE_DIR}"
       --result_path "${RESULT_DIR}"
-      --model_name "${VLM_MODEL}"
+      --model_name "${VLM_API_MODEL_NAME}"
       --base_url "${VLM_BASE_URL}"
       --max_workers "${MAX_WORKERS}"
     )
@@ -169,10 +171,10 @@ if [[ "${RUN_BUILD_CODE_GRAPH}" == "1" ]]; then
     --output_dir "${RESULT_DIR}" \
     --image_dir "${IMAGE_DIR}" \
     --repo_path "${REPO_DIR}" \
-    --model_name "${VLM_MODEL}" \
+    --model_name "${VLM_API_MODEL_NAME}" \
     --base_url "${VLM_BASE_URL}" \
     --result_path "${RESULT_DIR}" \
-    --text_model_name "${TEXT_MODEL_NAME}" \
+    --text_model_name "${TEXT_API_MODEL_NAME}" \
     --text_base_url "${TEXT_BASE_URL}" \
     --text_api_key "${TEXT_API_KEY}" \
     "${REBUILD_ARGS[@]}"
@@ -187,10 +189,10 @@ if [[ "${RUN_ALIGN_CODE_GRAPH}" == "1" ]]; then
     --output_dir "${RESULT_DIR}" \
     --image_dir "${IMAGE_DIR}" \
     --repo_path "${REPO_DIR}" \
-    --model_name "${VLM_MODEL}" \
+    --model_name "${VLM_API_MODEL_NAME}" \
     --base_url "${VLM_BASE_URL}" \
     --result_path "${RESULT_DIR}" \
-    --text_model_name "${TEXT_MODEL_NAME}" \
+    --text_model_name "${TEXT_API_MODEL_NAME}" \
     --text_base_url "${TEXT_BASE_URL}" \
     --text_api_key "${TEXT_API_KEY}" \
     "${REBUILD_ARGS[@]}"
